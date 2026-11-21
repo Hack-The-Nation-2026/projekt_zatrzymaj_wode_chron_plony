@@ -5,61 +5,113 @@ import { api } from "./api.js";
 import Scenarios from "./Scenarios.jsx";
 
 Font.register({
-  family: "Inter",
+  family: "Roboto",
   fonts: [
-    { src: "/fonts/Inter-Regular.ttf" },
-    { src: "/fonts/Inter-Bold.ttf", fontWeight: 700 },
+    { src: "https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-regular-webfont.ttf" },
+    { src: "https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-bold-webfont.ttf", fontWeight: 700 },
   ],
 });
 
+const dedupeRecommendations = (recs = []) => {
+  const seen = new Set();
+  return recs.filter((r) => {
+    const key = `${r.step}|${r.title}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const groupRecommendations = (recs = []) => {
+  const groups = [];
+  for (const r of dedupeRecommendations(recs)) {
+    let g = groups.find((x) => x.step === r.step);
+    if (!g) {
+      g = { step: r.step, items: [] };
+      groups.push(g);
+    }
+    g.items.push(r);
+  }
+  return groups;
+};
+
 const s = StyleSheet.create({
-  page: { padding: 36, fontFamily: "Inter", fontSize: 10, color: "#1a2a1f" },
-  header: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16,
+  page: { padding: 36, fontFamily: "Roboto", fontSize: 10, color: "#1a2a1f" },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14,
             borderBottomWidth: 2, borderBottomColor: "#4a9d3f", paddingBottom: 8 },
-  title: { fontSize: 20, fontWeight: 700 },
-  badge: { backgroundColor: "#fff3cd", color: "#8a6d00", padding: "3 8", borderRadius: 10 },
+  title: { fontSize: 18, fontWeight: 700 },
+  meta: { fontSize: 9, color: "#4a5a50", marginBottom: 12 },
+  badge: { backgroundColor: "#fff3cd", color: "#8a6d00", padding: "4 10", borderRadius: 10, fontSize: 9, fontWeight: 700 },
   row: { flexDirection: "row", gap: 12, marginBottom: 12 },
   card: { flex: 1, borderWidth: 1, borderColor: "#d8e0da", borderRadius: 6, padding: 10 },
-  cardLabel: { fontSize: 8, color: "#667", textTransform: "uppercase", marginBottom: 4 },
-  step: { borderLeftWidth: 3, borderLeftColor: "#4a9d3f", paddingLeft: 8, marginBottom: 8 },
+  cardLabel: { fontSize: 8, color: "#556", textTransform: "uppercase", marginBottom: 4, fontWeight: 700 },
+  table: { borderWidth: 1, borderColor: "#d8e0da", borderRadius: 6, marginTop: 6 },
+  trHead: { flexDirection: "row", backgroundColor: "#eef4ef", borderBottomWidth: 1, borderBottomColor: "#d8e0da", padding: "7 10" },
+  tr: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#e6ece8", padding: "8 10" },
+  thStep: { width: "24%", fontSize: 8, fontWeight: 700, color: "#2d4a34", textTransform: "uppercase" },
+  thAction: { width: "76%", fontSize: 8, fontWeight: 700, color: "#2d4a34", textTransform: "uppercase" },
+  tdStep: { width: "24%", fontSize: 9, fontWeight: 700, color: "#2b6e3f", paddingRight: 8 },
+  tdAction: { width: "76%", fontSize: 9 },
+  itemBlock: { marginBottom: 6 },
 });
 
-const ReportPdf = ({ report }) => (
-  <Document>
-    <Page size="A4" style={s.page}>
-      <View style={s.header}>
-        <Text style={s.title}>Raport niedoborów</Text>
-        <Text style={s.badge}>Ryzyko suszy: {report.risk_level}</Text>
-      </View>
-      <View style={s.row}>
-        <View style={s.card}>
-          <Text style={s.cardLabel}>Główne przyczyny</Text>
-          <Text>{report.main_cause}</Text>
-          <Text>{report.secondary_cause}</Text>
+const ReportPdf = ({ report }) => {
+  const grouped = groupRecommendations(report.recommendations);
+  return (
+    <Document>
+      <Page size="A4" style={s.page}>
+        <View style={s.header}>
+          <Text style={s.title}>Raport niedoborów – Wodnik</Text>
+          <Text style={s.badge}>Ryzyko suszy: {report.risk_level}</Text>
         </View>
-        <View style={s.card}>
-          <Text style={s.cardLabel}>Bilans wodny (FAO-56 / ERA5)</Text>
-          <Text>KBW (60 dni): {report.raw.kbw60_mm}</Text>
-          <Text>Wyczerpanie: {report.raw.depletion_mm} / TAW {report.raw.taw_mm}</Text>
+        <Text style={s.meta}>
+          Działka: {report.parcel?.id} ({report.parcel?.region})  |  Uprawa: {report.crop?.name}  |  Data analizy: {report.date}
+        </Text>
+        <View style={s.row}>
+          <View style={s.card}>
+            <Text style={s.cardLabel}>Główne przyczyny</Text>
+            <Text>{report.main_cause}</Text>
+            <Text style={{ marginTop: 3, color: "#445" }}>{report.secondary_cause}</Text>
+          </View>
+          <View style={s.card}>
+            <Text style={s.cardLabel}>Bilans wodny (FAO-56 / ERA5)</Text>
+            <Text>KBW (60 dni): {report.raw.kbw60_mm}</Text>
+            <Text>Wyczerpanie: {report.raw.depletion_mm} / TAW {report.raw.taw_mm}</Text>
+            <Text style={{ marginTop: 3, color: "#445" }}>{report.raw.percentile}</Text>
+          </View>
         </View>
-      </View>
-      {report.scenarios && (
-        <View style={[s.card, { marginBottom: 12 }]}>
-          <Text style={s.cardLabel}>Co dalej: najbliższe {report.scenarios.horizon_days} dni ({report.scenarios.years} scenariuszy)</Text>
-          <Text>{report.scenarios.summary}</Text>
-          <Text>Woda potrzebna, by uniknąć stresu: ok. {report.scenarios.water_needed_p50_mm} mm (suchy scenariusz: {report.scenarios.water_needed_p90_mm} mm)</Text>
+        {report.scenarios && (
+          <View style={[s.card, { marginBottom: 12 }]}>
+            <Text style={s.cardLabel}>Co dalej: najbliższe {report.scenarios.horizon_days} dni ({report.scenarios.years} scenariuszy)</Text>
+            <Text>{report.scenarios.summary}</Text>
+            <Text style={{ marginTop: 3 }}>
+              Woda potrzebna, by uniknąć stresu: ok. {report.scenarios.water_needed_p50_mm} mm (suchy scenariusz: {report.scenarios.water_needed_p90_mm} mm)
+            </Text>
+          </View>
+        )}
+        <View style={s.table}>
+          <View style={s.trHead}>
+            <Text style={s.thStep}>Etap KOWR</Text>
+            <Text style={s.thAction}>Zalecane działania i uzasadnienie</Text>
+          </View>
+          {grouped.map((g, gi) => (
+            <View key={g.step} style={[s.tr, gi === grouped.length - 1 && { borderBottomWidth: 0 }]} wrap={false}>
+              <Text style={s.tdStep}>{g.step}</Text>
+              <View style={s.tdAction}>
+                {g.items.map((it, ii) => (
+                  <View key={ii} style={ii < g.items.length - 1 ? s.itemBlock : null}>
+                    <Text style={{ fontWeight: 700 }}>{it.title}</Text>
+                    <Text style={{ color: "#334", marginTop: 1 }}>{it.detail}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))}
         </View>
-      )}
-      {report.recommendations.map((r, i) => (
-        <View key={i} style={s.step} wrap={false}>
-          <Text>{r.step}</Text>
-          <Text style={{ fontWeight: 700 }}>{r.title}</Text>
-          <Text>{r.detail}</Text>
-        </View>
-      ))}
-    </Page>
-  </Document>
-);
+      </Page>
+    </Document>
+  );
+};
 
 
 // --- LISTA UPRAW (jako klocki z kategoriami jak na screenie 2) ---
@@ -84,7 +136,109 @@ const CATEGORIES = ["Wszystkie", "Zboża", "Oleiste", "Okopowe", "Inne"];
 // Działka demo z gotowym wynikiem (działa bez internetu): 101609_2.0011.352, data 2026-06-15, pszenica ozima.
 const DEMO = { id: "101609_2.0011.352", date: "2026-06-15", lat: "51.5450", lon: "19.9493" };
 
+function ParcelMap({ parcel, initialCenter, onPickPoint }) {
+  const mapElRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const parcelLayerRef = useRef(null);
 
+  useEffect(() => {
+    const L = window.L;
+    if (!L || !mapElRef.current || mapInstanceRef.current) return;
+
+    const map = L.map(mapElRef.current, { zoomControl: true }).setView(initialCenter || [51.545, 19.9493], 15);
+    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "© OpenStreetMap",
+    });
+    const orto = L.tileLayer.wms("https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMS/StandardResolution", {
+      layers: "Raster",
+      format: "image/jpeg",
+      maxZoom: 19,
+      attribution: "Ortofotomapa © GUGiK",
+    });
+    const parcels = L.tileLayer.wms("https://integracja.gugik.gov.pl/cgi-bin/KrajowaIntegracjaEwidencjiGruntow", {
+      layers: "dzialki,numery_dzialek",
+      format: "image/png",
+      transparent: true,
+      minZoom: 15,
+      maxZoom: 19,
+      attribution: "Działki © GUGiK",
+    });
+
+    orto.addTo(map);
+    parcels.addTo(map);
+    L.control.layers({ "Zdjęcie lotnicze": orto, "Mapa": osm }, { "Granice działek": parcels }).addTo(map);
+
+    map.on("click", (e) => {
+      onPickPoint(e.latlng.lat.toFixed(6), e.latlng.lng.toFixed(6));
+    });
+
+    mapInstanceRef.current = map;
+    setTimeout(() => map.invalidateSize(), 100);
+
+    return () => {
+      map.remove();
+      mapInstanceRef.current = null;
+      parcelLayerRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const L = window.L;
+    const map = mapInstanceRef.current;
+    if (!L || !map) return;
+
+    if (parcelLayerRef.current) {
+      map.removeLayer(parcelLayerRef.current);
+      parcelLayerRef.current = null;
+    }
+
+    if (parcel?.geometry) {
+      const layer = L.geoJSON(parcel.geometry, {
+        style: { color: "#e8b13a", weight: 3, fillOpacity: 0.15 },
+      }).addTo(map);
+      parcelLayerRef.current = layer;
+      map.fitBounds(layer.getBounds(), { maxZoom: 17, padding: [24, 24] });
+    }
+  }, [parcel]);
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div
+        ref={mapElRef}
+        style={{
+          height: 300,
+          width: "100%",
+          borderRadius: 10,
+          border: "1px solid #2c465d",
+          overflow: "hidden",
+        }}
+      />
+      <div style={{ fontSize: 12, color: "#9db0c0", marginTop: 6 }}>
+        Dotknij dowolnego pola na mapie, aby pobrać granice działki z GUGiK ULDK.
+      </div>
+    </div>
+  );
+}
+
+// RESET
+// Pełny reset: czyści też pola formularza, wybraną uprawę i datę
+const handleRestart = () => {
+  setParcelInput("");
+  setLatInput("");
+  setLonInput("");
+  setShowMapPicker(false);
+  setSelectedParcel(null);
+  setCropSearch("");
+  setActiveCategory("Wszystkie");
+  setSelectedCropKey("pszenica_ozima");
+  setAnalysisDate(new Date().toISOString().slice(0, 10));
+  setReport(null);
+  setProgress([]);
+  setError("");
+  setLoadingReport(false);
+  topRef.current?.scrollIntoView({ behavior: "smooth" });
+};
 
 
 export default function App() {
@@ -180,15 +334,21 @@ export default function App() {
   //Pobieranie raportu
   const handleDownloadReport = async () => {
     if (!report) return;
-    const cropSlug = report.crop.key || report.crop.name.toLowerCase().replace(/\s+/g, "_");
-    const checkDate = report.date || new Date().toISOString().slice(0, 10);
-    const blob = await pdf(<ReportPdf report={report} />).toBlob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `raport_${cropSlug}_${checkDate}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const cropSlug = report.crop.key || report.crop.name.toLowerCase().replace(/\s+/g, "_");
+      const checkDate = report.date || new Date().toISOString().slice(0, 10);
+      const blob = await pdf(<ReportPdf report={report} />).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `raport_${cropSlug}_${checkDate}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (e) {
+      setError("Nie udało się wygenerować PDF: " + e.message);
+    }
   };
 
   const filteredCrops = CROPS.filter((c) => {
@@ -200,37 +360,17 @@ export default function App() {
   // Drukowanie raportu jako PDF
   const handlePrintReport = async () => {
     if (!report) return;
-
-    const blob = await pdf(<ReportPdf report={report} />).toBlob();
-    const url = URL.createObjectURL(blob);
-
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "1px";   // nie 0 – część przeglądarek wtedy nie drukuje
-    iframe.style.height = "1px";
-    iframe.style.border = "0";
-    iframe.style.opacity = "0";
-    iframe.src = url;
-
-    iframe.onload = () => {
-      try {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      } catch (e) {
-        // Fallback: otwórz PDF w nowej karcie, użytkownik wydrukuje stamtąd
-        window.open(url, "_blank");
+    try {
+      const blob = await pdf(<ReportPdf report={report} />).toBlob();
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, "_blank");
+      if (!win) {
+        window.print();
       }
-    };
-
-    document.body.appendChild(iframe);
-
-    // Sprzątanie po dłuższej chwili (dialog druku jest asynchroniczny)
-    setTimeout(() => {
-      URL.revokeObjectURL(url);
-      iframe.remove();
-    }, 60000);
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) {
+      window.print();
+    }
   };
 
 
@@ -240,13 +380,40 @@ export default function App() {
   return (
     <div ref={topRef}>
       <header className="topbar">
-        <strong style={{ fontSize: 16, cursor: "pointer" }} onClick={handleReset}>
-          Wodnik
-        </strong>
-        <button className="btn dark" style={{ height: 38, padding: "0 16px" }} onClick={handleReset}>
-          Strona główna
-        </button>
-      </header>
+  <strong style={{ fontSize: 16, cursor: "pointer" }} onClick={handleReset}>
+    Wodnik
+  </strong>
+  <div className="topbar-actions">
+    <button
+      className="btn dark icon-btn"
+      onClick={handleReset}
+      aria-label="Strona główna"
+      title="Strona główna"
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M3 11.5 12 4l9 7.5" />
+        <path d="M5 10v10h5v-6h4v6h5V10" />
+      </svg>
+    </button>
+    <button
+      className="btn dark"
+      style={{ height: 38, padding: "0 16px" }}
+      onClick={handleRestart}
+    >
+      Od nowa
+    </button>
+  </div>
+</header>
 
       <main className="container">
         {/* KROK 1: WYBÓR DZIAŁKI (widoczny od razu na starcie) */}
@@ -298,25 +465,18 @@ export default function App() {
                 </div>
 
                 {showMapPicker && (
-                  <div
-                    onClick={() => {
-                      setLatInput(DEMO.lat);
-                      setLonInput(DEMO.lon);
-                      handleFindByCoords(DEMO.lat, DEMO.lon);
+                  <ParcelMap
+                    parcel={selectedParcel}
+                    initialCenter={[
+                      Number(latInput) || Number(DEMO.lat),
+                      Number(lonInput) || Number(DEMO.lon),
+                    ]}
+                    onPickPoint={(lat, lon) => {
+                      setLatInput(lat);
+                      setLonInput(lon);
+                      handleFindByCoords(lat, lon);
                     }}
-                    style={{
-                      marginTop: 14,
-                      padding: 18,
-                      border: "1px dashed #2b6e3f",
-                      borderRadius: 10,
-                      background: "#f1f7f3",
-                      textAlign: "center",
-                      cursor: "pointer",
-                      fontSize: 13,
-                    }}
-                  >
-                    🗺️ <strong>Mapa (w przygotowaniu)</strong> — kliknij tutaj, aby pobrać przykładową działkę Łazisko 352 (51.5450, 19.9493)
-                  </div>
+                  />
                 )}
               </div>
 
@@ -353,9 +513,6 @@ export default function App() {
                   Zmień działkę ({selectedParcel.id})
                 </span>
               </div>
-              <p className="sub" style={{ marginBottom: 16 }}>
-                Wskaż uprawę na swojej działce, aby dopasować analizę retencji wody.
-              </p>
 
               <label>Szukaj uprawy</label>
               <input
@@ -500,14 +657,38 @@ export default function App() {
 
                     <Scenarios s={report.scenarios} />
 
-                    <div style={{ marginTop: 14 }}>
-                      {report.recommendations.map((rec, i) => (
-                        <div key={i} className="step-card">
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "#2b6e3f" }}>{rec.step}</div>
-                          <div style={{ fontSize: 14, fontWeight: 600 }}>{rec.title}</div>
-                          <div style={{ fontSize: 13, color: "#555" }}>{rec.detail}</div>
-                        </div>
-                      ))}
+                    <div className="rec-table-wrap">
+                      <table className="rec-table">
+                        <thead>
+                          <tr>
+                            <th>Etap ścieżki KOWR</th>
+                            <th>Zalecane działania na działce</th>
+                            <th>Pewność</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {groupRecommendations(report.recommendations).map((group) =>
+                            group.items.map((rec, idx) => (
+                              <tr key={`${group.step}-${idx}`} className={idx === 0 ? "rec-group-start" : ""}>
+                                {idx === 0 && (
+                                  <td className="rec-cat" rowSpan={group.items.length}>
+                                    {group.step}
+                                  </td>
+                                )}
+                                <td>
+                                  <div className="rec-item">
+                                    <div className="rec-title">{rec.title}</div>
+                                    <div className="rec-detail">{rec.detail}</div>
+                                  </div>
+                                </td>
+                                <td className="rec-conf">
+                                  <span className="badge">{rec.confidence || "średnia"}</span>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
 

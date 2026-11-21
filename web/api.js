@@ -30,6 +30,13 @@ export function toView(report, parcel, crop, id) {
     ...report.agrotechnics.filter((x) => x.priority <= 2).map((x) => ({ ...x, step: "2. Agrotechnika" })),
     ...report.irrigation.map((x) => ({ ...x, step: "3. Nawadnianie (ostateczność)" })),
   ];
+  const seen = new Set();
+  const uniqueSteps = steps.filter((x) => {
+    const key = `${x.step}|${x.title}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   return {
     id,
     parcel,
@@ -40,7 +47,7 @@ export function toView(report, parcel, crop, id) {
     confidence: report.confidence,
     main_cause: main ? `${main.name} (${main.because[0]})` : "Brak wyraźnej przyczyny",
     secondary_cause: second ? `${second.name} (${second.because[0]})` : "Brak drugorzędnych przyczyn",
-    recommendations: steps.map((x) => ({ step: x.step, title: x.title, detail: x.detail, confidence: x.confidence })),
+    recommendations: uniqueSteps.map((x) => ({ step: x.step, title: x.title, detail: x.detail, confidence: x.confidence })),
     raw: {
       kbw60_mm: num(raw.kbw60_mm, 1, "mm"),
       depletion_mm: num(raw.wyczerpanie_mm, 1, "mm"),

@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .cache/
 wyniki/
+.vscode/
+web/node_modules

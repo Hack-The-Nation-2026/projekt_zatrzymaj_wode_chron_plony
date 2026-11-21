@@ -12,7 +12,7 @@ from datetime import date, timedelta
 
 import numpy as np
 
-from . import crops, parcel as parcel_mod, soil as soil_mod, terrain as terrain_mod, waterbalance, weather
+from . import crops, parcel as parcel_mod, satellite, soil as soil_mod, terrain as terrain_mod, waterbalance, weather
 from .http import DataSourceError
 
 HISTORY_DAYS = 150
@@ -75,17 +75,29 @@ def _loc(spot) -> dict:
             "maps": f"https://www.google.com/maps?q={spot.lat:.6f},{spot.lon:.6f}"}
 
 
+STEPS = [("parcel", "Granice działki"), ("weather", "Pogoda z ostatnich miesięcy"), ("soil", "Gleba"),
+         ("terrain", "Ukształtowanie terenu"), ("satellite", "Zdjęcia satelitarne"),
+         ("analysis", "Wnioski i zalecenia")]
+
+
 def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date | None = None,
-            crop_key: str = "pszenica_ozima", today: date | None = None) -> Report:
+            crop_key: str = "pszenica_ozima", today: date | None = None, progress=None) -> Report:
+    """`progress(step)` jest wołane na początku każdego etapu (klucze z STEPS)."""
     today = today or date.today()
     on = on or today
     crop = crops.get(crop_key)
     uncertainty: list[str] = []
     sources: list[str] = ["GUGiK – Usługa Lokalizacji Działek Katastralnych (ULDK)"]
 
+    def step(name: str) -> None:
+        if progress:
+            progress(name)
+
     # --- Dane wejściowe ---------------------------------------------------------
+    step("parcel")
     p = parcel_mod.by_id(parcel_id) if parcel_id else parcel_mod.by_point(*point)
     lat, lon = p.centroid_latlon
+    step("weather")
 
     end = on + timedelta(days=7) if on >= today - timedelta(days=weather.ARCHIVE_LAG_DAYS) else on
     series = weather.daily_series(lat, lon, on - timedelta(days=HISTORY_DAYS), end, today=today)
@@ -96,6 +108,7 @@ def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date |
     clim = weather.climatology(lat, lon, on)
     sources.append(f"Open-Meteo archive – tło wieloletnie {weather.CLIMATE_YEARS[0]}–{weather.CLIMATE_YEARS[1]} (ERA5/ERA5-Land)")
 
+    step("soil")
     try:
         soil = soil_mod.at_point(lat, lon)
         sources.append("ISRIC SoilGrids 2.0 (uziarnienie, węgiel organiczny) + funkcja Saxton & Rawls (2006)")
@@ -103,12 +116,22 @@ def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date |
         soil = None
         uncertainty.append(f"Brak danych glebowych ({exc}); przyjęto glebę średnią.")
 
+    step("terrain")
     try:
         terr = terrain_mod.analyse(p)
         sources.append("GUGiK – Numeryczny Model Terenu z LIDAR (1 m), usługa WCS")
     except DataSourceError as exc:
         terr = None
         uncertainty.append(f"Analiza terenu niedostępna: {exc}")
+
+    step("satellite")
+    try:
+        sat = satellite.analyse(p, on)
+        sources.append("Copernicus Sentinel-2 L2A (katalog Earth Search, AWS Open Data) – NDVI, NDMI")
+    except Exception as exc:  # sieć, katalog STAC, odczyt rastrów – satelita jest uzupełnieniem, nie warunkiem
+        sat = None
+        uncertainty.append(f"Dane satelitarne niedostępne: {exc}")
+    step("analysis")
 
     awc = soil.awc if soil else 0.14
     bal = waterbalance.run(series, crop, awc, i_on)
@@ -148,6 +171,16 @@ def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date |
         score += 2
     elif pct_sm <= 25:
         score += 1
+    # Satelita: zawartość wody w roślinach (NDMI) i zmiana zieloności (NDVI) między zdjęciami.
+    # Progi heurystyczne: NDMI ≥ 0,2 dobre uwodnienie, 0–0,2 umiarkowane, < 0 niskie (przy NDVI ≥ 0,4).
+    sc = sat.current if sat else None
+    ndvi_change = (sc.ndvi - sat.previous.ndvi) if sc and sat.previous else None
+    growing = on.month in range(4, 10)
+    if sc and growing and sc.ndvi >= 0.4:
+        if sc.ndmi < 0:
+            score += 1
+        elif sc.ndmi < 0.2 and ndvi_change is not None and ndvi_change <= -0.1:
+            score += 1
     if in_critical and score >= 2:
         score += 1
     risk = "wysokie" if score >= 5 else "umiarkowane" if score >= 3 else "niskie"
@@ -177,6 +210,28 @@ def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date |
              f"{num(DEFICIT_YEAR_KBW60)} mm.",
              ["odróżnia bieżącą suszę od stałej podatności miejsca"], "średnia"),
     ]
+    if sc:
+        lvl = "niska" if sc.ndmi < 0 else "umiarkowana" if sc.ndmi < 0.2 else "dobra"
+        sdate = date.fromisoformat(sc.date)
+        detail = (f"Zdjęcie z {sdate.strftime('%d.%m.%Y')}: zieloność (NDVI) {num(sc.ndvi, 2)}, "
+                  f"zawartość wody w roślinach (NDMI) {num(sc.ndmi, 2)}, czyli {lvl}.")
+        if sat.previous:
+            pdate = date.fromisoformat(sat.previous.date).strftime("%d.%m.%Y")
+            detail += (f" Od {pdate} zieloność zmieniła się o {num(ndvi_change, 2)}, "
+                       f"a woda w roślinach o {num(sc.ndmi - sat.previous.ndmi, 2)}.")
+        because = [f"Sentinel-2, {num(sc.valid_share * 100)}% działki bez chmur",
+                   f"najsuchsze 10% pola: NDMI ≤ {num(sc.ndmi_p10, 2)} (miejsce zaznaczone na mapie)",
+                   "progi heurystyczne; spadek zieloności może też oznaczać naturalne dojrzewanie"]
+        if (on - sdate).days > 10:
+            because.append(f"zdjęcie sprzed {(on - sdate).days} dni (nowsze były zachmurzone)")
+        loc = ({"lat": sc.dry_lat, "lon": sc.dry_lon,
+                "maps": f"https://www.google.com/maps?q={sc.dry_lat},{sc.dry_lon}"} if sc.dry_lat else None)
+        assessment.insert(3, Item("Stan roślin z satelity (Sentinel-2)", detail, because,
+                                  "średnia" if sc.valid_share >= 0.8 else "niska", loc))
+    else:
+        assessment.insert(3, Item("Stan roślin z satelity (Sentinel-2)",
+                                  "Brak bezchmurnego zdjęcia działki z ostatnich 30 dni.",
+                                  ["Sentinel-2 przelatuje co 2–5 dni, ale chmury często zasłaniają pole"], "niska"))
     if fc_p is not None:
         assessment.append(Item("Prognoza na 7 dni",
                                f"Opad ok. {num(fc_p)} mm, parowanie ok. {num(fc_e)} mm.",
@@ -326,7 +381,7 @@ def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date |
         "Pogoda pochodzi z reanalizy (siatka ok. 9–25 km): lokalne burze mogą dać inny opad niż w modelu.",
         "Gleba z modelu SoilGrids (250 m) – docelowo mapa glebowo-rolnicza IUNG lub dane z badań gleby rolnika.",
         "Bilans wodny zakłada pełne uwilgotnienie gleby na początku okresu i miesięczne Kc wg FAO-56.",
-        "Brak jeszcze potwierdzenia satelitarnego stanu roślin (Sentinel-2 NDVI/NDMI) – w planie.",
+        "Wskaźniki satelitarne (NDVI, NDMI) oceniamy progami heurystycznymi; piksel 10–20 m, chmury mogą ograniczać dostępność zdjęć.",
         "Rowy i urządzenia melioracyjne nie są jeszcze uwzględnione (BDOT10k – w planie).",
     ]
     if uncertainty_crop:
@@ -350,5 +405,6 @@ def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date |
              "wyczerpanie_mm": round(dr, 1), "TAW_mm": round(taw, 1), "RAW_mm": round(raw, 1), "Ks": round(ks, 2),
              "dni_stresu_30d": bal.stress_days, "lata_z_deficytem": deficit_years, "lata_referencyjne": n_years,
              "gleba": asdict(soil) if soil else None, "teren": asdict(terr) if terr else None,
+             "satelita": asdict(sat) if sat else None,
              "wynik_ryzyka_pkt": score},
     )

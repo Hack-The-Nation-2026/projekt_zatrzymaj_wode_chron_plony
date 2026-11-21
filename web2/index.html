@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pl">
+<<<<<<< HEAD
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wodnik – woda na Twojej działce</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="panel">
+    <header class="brand">
+      <span class="logo" aria-hidden="true">💧</span>
+      <div>
+        <h1>Wodnik</h1>
+        <p class="tag">Sprawdź wodę na swojej działce</p>
+      </div>
+    </header>
+
+    <form id="form" class="card form" autocomplete="off">
+      <label for="parcelId">Działka</label>
+      <div class="row">
+        <input id="parcelId" placeholder="np. 101609_2.0011.352" inputmode="text">
+        <button type="button" id="findBtn" class="secondary">Szukaj</button>
+      </div>
+      <p class="hint">…albo dotknij swojego pola na mapie.</p>
+      <div id="parcelInfo" class="parcel-info" hidden></div>
+
+      <div class="row two">
+        <div>
+          <label for="date">Data</label>
+          <input id="date" type="date">
+        </div>
+        <div>
+          <label for="crop">Uprawa</label>
+          <select id="crop"></select>
+        </div>
+      </div>
+
+      <button type="submit" id="goBtn" class="primary" disabled>Sprawdź wodę</button>
+      <button type="button" id="demoBtn" class="link">Przykład: Łazisko, pszenica, 15.06.2026</button>
+      <p id="formError" class="error" role="alert" hidden></p>
+    </form>
+
+    <section id="progress" class="card" hidden aria-live="polite">
+      <h2>Sprawdzam Twoją działkę…</h2>
+      <ol id="steps" class="steps"></ol>
+    </section>
+
+    <section id="result" hidden></section>
+
+    <footer class="foot">
+      Prototyp HackNation 2026 · zadanie KOWR „Zatrzymaj wodę, chroń plony” ·
+      dane: GUGiK, Copernicus (ERA5, Sentinel-2), ISRIC SoilGrids, Open-Meteo
+    </footer>
+  </aside>
+
+  <main id="map" aria-label="Mapa działki"></main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+=======
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wodnik – Zatrzymaj wodę, chroń plony</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/main.jsx"></script>
+  </body>
+>>>>>>> 12b008e25e0522b78c6f9fd297cff93ec93bfd62
+</html>

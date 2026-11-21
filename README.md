@@ -40,6 +40,17 @@ WODNIK_OFFLINE=1 .venv/bin/python -m wodnik --dzialka 101609_2.0011.352 --data 2
 
 Pierwsze przeliczenie nowej działki trwa ok. 20–40 s (pobieranie tła wieloletniego i NMT), kolejne kilka sekund.
 
+## Dokumentacja
+
+| Dokument | Zawartość |
+|---|---|
+| [docs/ARCHITEKTURA.md](docs/ARCHITEKTURA.md) | struktura projektu, przepływ analizy, kontrakt danych, stos, bezpieczeństwo |
+| [docs/UI.md](docs/UI.md) | strony interfejsu, makiety, zasady prostoty obsługi |
+| [docs/API.md](docs/API.md) | zapytania do serwera (endpointy, żądania, odpowiedzi, błędy) |
+| [docs/RAPORT_AI.md](docs/RAPORT_AI.md) | raport AI na końcu analizy: prompt, kontrola liczb, zabezpieczenia |
+
+Stan: **rdzeń analizy działa** (`wodnik/`). Serwer, interfejs i raport AI są zaprojektowane i opisane w dokumentach powyżej, ale jeszcze niezbudowane.
+
 ## Jak to działa
 
 | Moduł | Co robi | Metoda |
@@ -76,6 +87,9 @@ Pierwsze przeliczenie nowej działki trwa ok. 20–40 s (pobieranie tła wielole
 | pyproj (z PROJ) | MIT |
 | requests | Apache-2.0 |
 | urllib3 | MIT |
+| anthropic (SDK, planowany, opcjonalny raport AI) | MIT |
+
+Planowany raport AI korzysta z Claude API (warunki komercyjne Anthropic). Moduł jest opcjonalny: bez klucza API Wodnik działa w pełni, a raport jest szablonowy (patrz [docs/RAPORT_AI.md](docs/RAPORT_AI.md)).
 
 Wszystkie licencje pozwalają na przeniesienie praw do rozwiązania na KOWR i dalsze wykorzystanie.
 

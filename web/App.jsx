@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Document, Page, Text, View, StyleSheet, Font, pdf } from "@react-pdf/renderer";
 import "./styles.css";
+import { api } from "./api.js";
+import Scenarios from "./Scenarios.jsx";
 
 Font.register({
   family: "Inter",
@@ -41,8 +43,15 @@ const ReportPdf = ({ report }) => (
           <Text>Wyczerpanie: {report.raw.depletion_mm} / TAW {report.raw.taw_mm}</Text>
         </View>
       </View>
-      {report.recommendations.map((r) => (
-        <View key={r.step} style={s.step} wrap={false}>
+      {report.scenarios && (
+        <View style={[s.card, { marginBottom: 12 }]}>
+          <Text style={s.cardLabel}>Co dalej: najbliższe {report.scenarios.horizon_days} dni ({report.scenarios.years} scenariuszy)</Text>
+          <Text>{report.scenarios.summary}</Text>
+          <Text>Woda potrzebna, by uniknąć stresu: ok. {report.scenarios.water_needed_p50_mm} mm (suchy scenariusz: {report.scenarios.water_needed_p90_mm} mm)</Text>
+        </View>
+      )}
+      {report.recommendations.map((r, i) => (
+        <View key={i} style={s.step} wrap={false}>
           <Text>{r.step}</Text>
           <Text style={{ fontWeight: 700 }}>{r.title}</Text>
           <Text>{r.detail}</Text>
@@ -71,40 +80,9 @@ const CROPS = [
 
 const CATEGORIES = ["Wszystkie", "Zboża", "Oleiste", "Okopowe", "Inne"];
 
-// --- DUMMY API ---
-const dummyApi = {
-  searchParcelById: async (id) => ({
-    id: id || "141201_1.0001.123/4",
-    commune: "Tomaszów Mazowiecki",
-    region: "Łazisko 352",
-    area_ha: 3.01,
-    center: { lat: 52.2297, lon: 21.0122 },
-  }),
-  resolveParcelByCoords: async (lat, lon) => ({
-    id: "101609_2.0011.352",
-    commune: "Tomaszów Mazowiecki",
-    region: `Działka (${lat}, ${lon})`,
-    area_ha: 3.01,
-    center: { lat: Number(lat) || 52.2297, lon: Number(lon) || 21.0122 },
-  }),
-  runAnalysis: async ({ parcel, crop }) => ({
-    id: "a1b2c3d4",
-    parcel,
-    crop,
-    date: new Date().toISOString().slice(0, 10),
-    risk_level: "Umiarkowane",
-    risk_summary: "Zapas wody w strefie korzeniowej kurczy się (wyczerpanie 69,0 mm przy progu stresu RAW 58,0 mm). Warto wdrożyć działania retencyjne.",
-    confidence: "średnia",
-    main_cause: "Gleba słabo magazynuje wodę (lekka, piaszczysta – TAW 106,0 mm)",
-    secondary_cause: "Odpływ powierzchniowy po spadku terenu (3,2% ku północy)",
-    recommendations: [
-      { step: "1. Retencja", title: "Zatrzymaj wodę w miejscu odpływu", detail: "Północna krawędź działki: zastawka lub próg spowalniający w rowie.", confidence: "średnia" },
-      { step: "2. Agrotechnika", title: "Międzyplon ścierniskowy i ograniczenie orki", detail: "Zwiększenie próchnicy i ograniczenie parowania wody z gleby.", confidence: "wysoka" },
-      { step: "3. Nawadnianie (ostateczność)", title: "Tylko interwencyjnie w fazie krytycznej", detail: "Zgodnie ze ścieżką KOWR stosowane wyłącznie po wyczerpaniu metod retencyjnych.", confidence: "średnia" },
-    ],
-    raw: { kbw60_mm: "-127,0 mm", depletion_mm: "69,0 mm", taw_mm: "106,0 mm", percentile: "16% najuboższych w wodę lat (z 31 lat)" },
-  }),
-};
+// Dane pochodzą z serwera Wodnika (web/api.js → FastAPI → analiza w wodnik/).
+// Działka demo z gotowym wynikiem (działa bez internetu): 101609_2.0011.352, data 2026-06-15, pszenica ozima.
+const DEMO = { id: "101609_2.0011.352", date: "2026-06-15", lat: "51.5450", lon: "19.9493" };
 
 
 
@@ -125,6 +103,9 @@ export default function App() {
   // Stan kroku 3: Raport
   const [loadingReport, setLoadingReport] = useState(false);
   const [report, setReport] = useState(null);
+  const [analysisDate, setAnalysisDate] = useState(new Date().toISOString().slice(0, 10));
+  const [progress, setProgress] = useState([]);
+  const [error, setError] = useState("");
 
   // Referencje do płynnego scrollowania w dół
   const topRef = useRef(null);
@@ -145,25 +126,48 @@ export default function App() {
     }
   }, [loadingReport, report]);
 
-  const handleFindById = async () => {
-    const p = await dummyApi.searchParcelById(parcelInput.trim() || "141201_1.0001.123/4");
-    setSelectedParcel(p);
+  const pickParcel = async (load) => {
+    setError("");
+    setReport(null);
+    try {
+      setSelectedParcel(await load());
+    } catch (e) {
+      setError(e.message);
+    }
   };
 
-  const handleFindByCoords = async () => {
-    const p = await dummyApi.resolveParcelByCoords(latInput || "52.2297", lonInput || "21.0122");
-    setSelectedParcel(p);
+  const handleFindById = () => {
+    const id = parcelInput.trim();
+    if (!id) return setError("Wpisz identyfikator działki, np. " + DEMO.id);
+    pickParcel(() => api.searchParcelById(id));
+  };
+
+  const handleFindByCoords = (lat = latInput, lon = lonInput) => {
+    if (!lat || !lon) return setError("Podaj obie współrzędne albo wybierz działkę na mapie.");
+    pickParcel(() => api.resolveParcelByCoords(lat, lon));
+  };
+
+  const handleDemo = () => {
+    setParcelInput(DEMO.id);
+    setAnalysisDate(DEMO.date);
+    setSelectedCropKey("pszenica_ozima");
+    pickParcel(() => api.searchParcelById(DEMO.id));
   };
 
   const handleConfirmCrop = async () => {
     if (!selectedParcel) return;
     const cropObj = CROPS.find((c) => c.key === selectedCropKey) || CROPS[0];
+    setError("");
+    setReport(null);
+    setProgress([]);
     setLoadingReport(true);
-    setTimeout(async () => {
-      const res = await dummyApi.runAnalysis({ parcel: selectedParcel, crop: cropObj });
-      setReport(res);
+    try {
+      setReport(await api.runAnalysis({ parcel: selectedParcel, crop: cropObj, date: analysisDate, onProgress: setProgress }));
+    } catch (e) {
+      setError(e.message);
+    } finally {
       setLoadingReport(false);
-    }, 450);
+    }
   };
 
   const handleReset = () => {
@@ -296,9 +300,9 @@ export default function App() {
                 {showMapPicker && (
                   <div
                     onClick={() => {
-                      setLatInput("51.5450");
-                      setLonInput("19.9493");
-                      handleFindByCoords();
+                      setLatInput(DEMO.lat);
+                      setLonInput(DEMO.lon);
+                      handleFindByCoords(DEMO.lat, DEMO.lon);
                     }}
                     style={{
                       marginTop: 14,
@@ -311,13 +315,13 @@ export default function App() {
                       fontSize: 13,
                     }}
                   >
-                    🗺️ <strong>Ortofotomapa GUGiK (dummy)</strong> — kliknij tutaj, aby pobrać działkę Łazisko 352 (51.5450, 19.9493)
+                    🗺️ <strong>Mapa (w przygotowaniu)</strong> — kliknij tutaj, aby pobrać przykładową działkę Łazisko 352 (51.5450, 19.9493)
                   </div>
                 )}
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 20 }}>
-                <button className="btn dark" onClick={handleFindByCoords}>
+                <button className="btn dark" onClick={() => handleFindByCoords()}>
                   Użyj współrzędnych
                 </button>
                 <button className="btn" onClick={() => setShowMapPicker((v) => !v)}>
@@ -328,8 +332,12 @@ export default function App() {
           </div>
 
           <p style={{ textAlign: "center", color: "#777770", fontSize: 13, marginTop: 28 }}>
-            Wystarczy jedna metoda — numer działki lub lokalizacja.
+            Wystarczy jedna metoda — numer działki lub lokalizacja.{" "}
+            <span style={{ color: "#63b34e", cursor: "pointer", textDecoration: "underline" }} onClick={handleDemo}>
+              Wypróbuj na przykładzie (Łazisko, 15.06.2026)
+            </span>
           </p>
+          {error && !selectedParcel && <p className="error-msg" role="alert">{error}</p>}
         </section>
 
         {/* KROK 2: WYBÓR UPRAWY JAKO KLOCKI (pojawia się i scrolluje w dół po wyborze działki) */}
@@ -395,6 +403,12 @@ export default function App() {
                 })}
               </div>
 
+              {/* Data analizy – wymóg zadania: analiza dla wskazanej działki i daty */}
+              <label>Data analizy</label>
+              <input type="date" value={analysisDate} max={new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10)}
+                     onChange={(e) => setAnalysisDate(e.target.value)} />
+              {error && selectedParcel && <p className="error-msg" role="alert">{error}</p>}
+
               {/* Stopka wyboru uprawy */}
               <div className="panel-footer">
                 <div style={{ fontSize: 13, color: "#555" }}>
@@ -423,9 +437,14 @@ export default function App() {
               {loadingReport ? (
                 <div style={{ padding: "24px 0", textAlign: "center" }}>
                   <h2>Generowanie raportu niedoborów…</h2>
-                  <p className="sub" style={{ marginBottom: 0 }}>
-                    Pobieranie danych GUGiK ULDK/NMT, ERA5-Land oraz SoilGrids…
+                  <p className="sub" style={{ marginBottom: 12 }}>
+                    Pobieranie danych GUGiK, ERA5, SoilGrids i Sentinel-2. Pierwsza analiza działki trwa do ok. minuty.
                   </p>
+                  <ul className="progress-list">
+                    {progress.map((s) => (
+                      <li key={s.step} className={s.state}>{s.label}</li>
+                    ))}
+                  </ul>
                 </div>
               ) : (
                 <>
@@ -478,6 +497,8 @@ export default function App() {
                         </div>
                       </div>
                     </div>
+
+                    <Scenarios s={report.scenarios} />
 
                     <div style={{ marginTop: 14 }}>
                       {report.recommendations.map((rec, i) => (

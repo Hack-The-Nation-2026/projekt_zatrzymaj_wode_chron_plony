@@ -36,8 +36,11 @@ def _to_arr(values) -> np.ndarray:
 
 
 def _fetch(url: str, lat: float, lon: float, start: date, end: date, daily: str) -> dict:
+    # Przyciągamy punkt do siatki 0,1° (rozdzielczość ERA5-Land): dane i tak pochodzą z najbliższego
+    # węzła siatki, a sąsiednie działki trafiają wtedy w ten sam wpis cache (mniej zapytań do limitu API).
+    lat, lon = round(lat * 10) / 10, round(lon * 10) / 10
     return get_json(url, {
-        "latitude": f"{lat:.4f}", "longitude": f"{lon:.4f}",
+        "latitude": f"{lat:.2f}", "longitude": f"{lon:.2f}",
         "start_date": start.isoformat(), "end_date": end.isoformat(),
         "daily": daily, "timezone": "Europe/Warsaw",
     })["daily"]
@@ -71,6 +74,9 @@ def daily_series(lat: float, lon: float, start: date, end: date, today: date | N
     return Series([date.fromisoformat(x) for x in dates], _to_arr(p), _to_arr(e), _to_arr(t), _to_arr(sm), sources)
 
 
+SCENARIO_DAYS = 30  # horyzont scenariuszy „co dalej” (dni po dacie analizy)
+
+
 @dataclass
 class Climate:
     """Te same okna kalendarzowe w latach referencyjnych."""
@@ -79,32 +85,42 @@ class Climate:
     kbw30: np.ndarray
     kbw60: np.ndarray
     soil_moisture: np.ndarray  # średnia z ±7 dni wokół daty
+    future_precip: list = field(default_factory=list)  # na rok: opad w dniach 1..SCENARIO_DAYS po dacie
+    future_et0: list = field(default_factory=list)
 
 
-def climatology(lat: float, lon: float, target: date) -> Climate:
-    y0, y1 = CLIMATE_YEARS
-    raw = _fetch(ARCHIVE_URL, lat, lon, date(y0, 1, 1), date(y1, 12, 31),
+def _year_window(lat: float, lon: float, d: date):
+    """Okno z jednego roku: 60 dni przed datą (bilans 30/60 dni), wilgotność ±7 dni
+    oraz SCENARIO_DAYS dni po dacie (pogoda do scenariuszy)."""
+    raw = _fetch(ARCHIVE_URL, lat, lon, d - timedelta(days=59), d + timedelta(days=SCENARIO_DAYS),
                  "precipitation_sum,et0_fao_evapotranspiration,soil_moisture_0_to_100cm_mean")
-    days = [date.fromisoformat(x) for x in raw["time"]]
-    idx = {d: i for i, d in enumerate(days)}
     p = _to_arr(raw["precipitation_sum"])
     e = _to_arr(raw["et0_fao_evapotranspiration"])
     sm = _to_arr(raw["soil_moisture_0_to_100cm_mean"])
+    i = 59  # indeks daty docelowej w oknie
+    return (float(np.nansum(p[i - 29:i + 1] - e[i - 29:i + 1])),
+            float(np.nansum(p[:i + 1] - e[:i + 1])),
+            float(np.nanmean(sm[i - 7:i + 8])),
+            np.nan_to_num(p[i + 1:i + 1 + SCENARIO_DAYS]),
+            np.nan_to_num(e[i + 1:i + 1 + SCENARIO_DAYS]))
 
-    years, k30, k60, smv = [], [], [], []
+
+def climatology(lat: float, lon: float, target: date) -> Climate:
+    """Tło wieloletnie: zamiast 31 pełnych lat pobieramy tylko potrzebne okna (wielokrotnie
+    mniejsze zużycie limitu darmowego API, a każde okno trafia osobno do cache)."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    y0, y1 = CLIMATE_YEARS
+    days = []
     for y in range(y0, y1 + 1):
         try:
-            d = target.replace(year=y)
+            days.append(target.replace(year=y))
         except ValueError:  # 29 lutego
-            d = target.replace(year=y, day=28)
-        if d not in idx or (d - timedelta(days=60)) not in idx:
-            continue
-        i = idx[d]
-        years.append(y)
-        k30.append(np.nansum(p[i - 29:i + 1] - e[i - 29:i + 1]))
-        k60.append(np.nansum(p[i - 59:i + 1] - e[i - 59:i + 1]))
-        smv.append(np.nanmean(sm[max(0, i - 7):i + 8]))
-    return Climate(years, np.array(k30), np.array(k60), np.array(smv))
+            days.append(target.replace(year=y, day=28))
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        rows = list(ex.map(lambda d: _year_window(lat, lon, d), days))
+    k30, k60, smv, fp, fe = zip(*rows)
+    return Climate([d.year for d in days], np.array(k30), np.array(k60), np.array(smv), list(fp), list(fe))
 
 
 def percentile_of(value: float, sample: np.ndarray) -> float:

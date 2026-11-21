@@ -138,7 +138,14 @@ Wynik lub postęp. Front odpytuje co 1–2 s, dopóki `status` ≠ `running`.
     "uncertainty":  [ "…" ],
     "confidence": "średnia",
     "data_sources": [ "GUGiK – ULDK", "Open-Meteo archive (ERA5/ERA5-Land)" ],
-    "raw": { "kbw60_mm": -127.0, "wyczerpanie_mm": 69.0, "TAW_mm": 106.0, "RAW_mm": 58.0 } },
+    "raw": { "kbw60_mm": -127.0, "wyczerpanie_mm": 69.0, "TAW_mm": 106.0, "RAW_mm": 58.0 },
+    "scenarios": {
+      "horizon_days": 30, "years": 31, "in_stress_now": false, "level": "umiarkowane",
+      "p_stress_14": 0.35, "p_stress_30": 0.55, "p_severe_30": 0.2, "p_recovery_30": 0.0,
+      "median_onset_day": 12, "water_needed_p50_mm": 38.0, "water_needed_p90_mm": 74.0,
+      "forecast_days_used": 0,
+      "summary": "W 11 z 31 scenariuszy pogodowych roślina wejdzie w stres wodny w ciągu 14 dni, a w 17 z 31 w ciągu 30 dni.",
+      "envelope": [ { "day": 1, "date": "2026-06-16", "p10": 52.1, "p50": 55.0, "p90": 57.3 } ] } },
   "timeseries": [ { "date": "2026-06-14", "precip": 0.0, "et0": 4.8, "depletion": 66.1, "raw_threshold": 58.0 } ],
   "meta": { "computed_ms": 6400, "from_cache": ["uldk", "weather"], "rules_version": "0.1.0" } }
 ```

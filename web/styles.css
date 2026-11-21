@@ -35,3 +35,22 @@ input:focus { outline: 2px solid #589e47; border-color: transparent; }
 .badge.warn { background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
 .step-card { border: 1px solid #22394d; border-left: 3px solid #63b34e; border-radius: 10px; padding: 14px 16px; margin-top: 10px; background: #0c1924; color: #dce6ee !important; }
 .step-card div, .panel p { color: #c7d5e0 !important; }
+
+/* --- dodane przy podłączeniu API --- */
+.error-msg { color: #ff8a80; background: #2a1618; border: 1px solid #5c2a2e; border-radius: 10px; padding: 10px 14px; font-size: 14px; margin: 14px 0 0; }
+.progress-list { list-style: none; padding: 0; margin: 0 auto; display: inline-block; text-align: left; font-size: 14px; color: #9db0c0; }
+.progress-list li { padding: 3px 0; }
+.progress-list li::before { content: "○  "; }
+.progress-list li.running { color: #ffffff; font-weight: 600; }
+.progress-list li.running::before { content: "◔  "; }
+.progress-list li.done { color: #d3dfe8; }
+.progress-list li.done::before { content: "✔  "; color: #63b34e; }
+.progress-list li.failed::before { content: "✖  "; color: #ff8a80; }
+input[type="date"] { color-scheme: dark; }
+.scenarios { margin-top: 14px; }
+.scen-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.scen-stats div { background: #0c1924; border: 1px solid #22394d; border-radius: 10px; padding: 10px 12px; }
+.scen-stats b { display: block; font-size: 20px; color: #ffffff; }
+.scen-stats span { font-size: 12px; color: #9db0c0; }
+.badge.ok { background: rgba(99, 179, 78, 0.18); color: #8fd47a; border: 1px solid rgba(99, 179, 78, 0.45); }
+.badge.bad { background: rgba(255, 138, 128, 0.15); color: #ff8a80; border: 1px solid rgba(255, 138, 128, 0.45); }

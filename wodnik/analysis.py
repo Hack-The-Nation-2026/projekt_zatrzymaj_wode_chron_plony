@@ -12,7 +12,8 @@ from datetime import date, timedelta
 
 import numpy as np
 
-from . import crops, parcel as parcel_mod, soil as soil_mod, terrain as terrain_mod, waterbalance, weather
+from . import (crops, parcel as parcel_mod, satellite, scenarios, soil as soil_mod, terrain as terrain_mod,
+               waterbalance, weather)
 from .http import DataSourceError
 
 HISTORY_DAYS = 150
@@ -65,6 +66,7 @@ class Report:
     confidence: str
     data_sources: list
     raw: dict
+    scenarios: dict | None = None  # „co dalej”: 30 dni, scenariusze z 31 lat (scenarios.Outlook)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -75,17 +77,29 @@ def _loc(spot) -> dict:
             "maps": f"https://www.google.com/maps?q={spot.lat:.6f},{spot.lon:.6f}"}
 
 
+STEPS = [("parcel", "Granice działki"), ("weather", "Pogoda z ostatnich miesięcy"), ("soil", "Gleba"),
+         ("terrain", "Ukształtowanie terenu"), ("satellite", "Zdjęcia satelitarne"),
+         ("analysis", "Wnioski i zalecenia")]
+
+
 def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date | None = None,
-            crop_key: str = "pszenica_ozima", today: date | None = None) -> Report:
+            crop_key: str = "pszenica_ozima", today: date | None = None, progress=None) -> Report:
+    """`progress(step)` jest wołane na początku każdego etapu (klucze z STEPS)."""
     today = today or date.today()
     on = on or today
     crop = crops.get(crop_key)
     uncertainty: list[str] = []
     sources: list[str] = ["GUGiK – Usługa Lokalizacji Działek Katastralnych (ULDK)"]
 
+    def step(name: str) -> None:
+        if progress:
+            progress(name)
+
     # --- Dane wejściowe ---------------------------------------------------------
+    step("parcel")
     p = parcel_mod.by_id(parcel_id) if parcel_id else parcel_mod.by_point(*point)
     lat, lon = p.centroid_latlon
+    step("weather")
 
     end = on + timedelta(days=7) if on >= today - timedelta(days=weather.ARCHIVE_LAG_DAYS) else on
     series = weather.daily_series(lat, lon, on - timedelta(days=HISTORY_DAYS), end, today=today)
@@ -96,6 +110,7 @@ def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date |
     clim = weather.climatology(lat, lon, on)
     sources.append(f"Open-Meteo archive – tło wieloletnie {weather.CLIMATE_YEARS[0]}–{weather.CLIMATE_YEARS[1]} (ERA5/ERA5-Land)")
 
+    step("soil")
     try:
         soil = soil_mod.at_point(lat, lon)
         sources.append("ISRIC SoilGrids 2.0 (uziarnienie, węgiel organiczny) + funkcja Saxton & Rawls (2006)")
@@ -103,12 +118,22 @@ def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date |
         soil = None
         uncertainty.append(f"Brak danych glebowych ({exc}); przyjęto glebę średnią.")
 
+    step("terrain")
     try:
         terr = terrain_mod.analyse(p)
         sources.append("GUGiK – Numeryczny Model Terenu z LIDAR (1 m), usługa WCS")
     except DataSourceError as exc:
         terr = None
         uncertainty.append(f"Analiza terenu niedostępna: {exc}")
+
+    step("satellite")
+    try:
+        sat = satellite.analyse(p, on)
+        sources.append("Copernicus Sentinel-2 L2A (katalog Earth Search, AWS Open Data) – NDVI, NDMI")
+    except Exception as exc:  # sieć, katalog STAC, odczyt rastrów – satelita jest uzupełnieniem, nie warunkiem
+        sat = None
+        uncertainty.append(f"Dane satelitarne niedostępne: {exc}")
+    step("analysis")
 
     awc = soil.awc if soil else 0.14
     bal = waterbalance.run(series, crop, awc, i_on)
@@ -134,6 +159,14 @@ def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date |
         fc_p = float(np.nansum(series.precip[i_on + 1:]))
         fc_e = float(np.nansum(series.et0[i_on + 1:]))
 
+    # Scenariusze „co dalej” (30 dni): bilans FAO-56 do przodu z pogodą z każdego z 31 lat;
+    # dla dat bieżących pierwsze dni z prognozy.
+    outlook = scenarios.run(
+        on, dr, taw, raw, crop, clim.future_precip, clim.future_et0, clim.years,
+        np.nan_to_num(series.precip[i_on + 1:]) if end > on else None,
+        np.nan_to_num(series.et0[i_on + 1:]) if end > on else None,
+        horizon=weather.SCENARIO_DAYS)
+
     # --- 1. Ocena sytuacji wodnej -------------------------------------------------
     score = 0
     if dr > raw:
@@ -148,6 +181,16 @@ def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date |
         score += 2
     elif pct_sm <= 25:
         score += 1
+    # Satelita: zawartość wody w roślinach (NDMI) i zmiana zieloności (NDVI) między zdjęciami.
+    # Progi heurystyczne: NDMI ≥ 0,2 dobre uwodnienie, 0–0,2 umiarkowane, < 0 niskie (przy NDVI ≥ 0,4).
+    sc = sat.current if sat else None
+    ndvi_change = (sc.ndvi - sat.previous.ndvi) if sc and sat.previous else None
+    growing = on.month in range(4, 10)
+    if sc and growing and sc.ndvi >= 0.4:
+        if sc.ndmi < 0:
+            score += 1
+        elif sc.ndmi < 0.2 and ndvi_change is not None and ndvi_change <= -0.1:
+            score += 1
     if in_critical and score >= 2:
         score += 1
     risk = "wysokie" if score >= 5 else "umiarkowane" if score >= 3 else "niskie"
@@ -177,6 +220,37 @@ def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date |
              f"{num(DEFICIT_YEAR_KBW60)} mm.",
              ["odróżnia bieżącą suszę od stałej podatności miejsca"], "średnia"),
     ]
+    if sc:
+        lvl = "niska" if sc.ndmi < 0 else "umiarkowana" if sc.ndmi < 0.2 else "dobra"
+        sdate = date.fromisoformat(sc.date)
+        detail = (f"Zdjęcie z {sdate.strftime('%d.%m.%Y')}: zieloność (NDVI) {num(sc.ndvi, 2)}, "
+                  f"zawartość wody w roślinach (NDMI) {num(sc.ndmi, 2)}, czyli {lvl}.")
+        if sat.previous:
+            pdate = date.fromisoformat(sat.previous.date).strftime("%d.%m.%Y")
+            detail += (f" Od {pdate} zieloność zmieniła się o {num(ndvi_change, 2)}, "
+                       f"a woda w roślinach o {num(sc.ndmi - sat.previous.ndmi, 2)}.")
+        because = [f"Sentinel-2, {num(sc.valid_share * 100)}% działki bez chmur",
+                   f"najsuchsze 10% pola: NDMI ≤ {num(sc.ndmi_p10, 2)} (miejsce zaznaczone na mapie)",
+                   "progi heurystyczne; spadek zieloności może też oznaczać naturalne dojrzewanie"]
+        if (on - sdate).days > 10:
+            because.append(f"zdjęcie sprzed {(on - sdate).days} dni (nowsze były zachmurzone)")
+        loc = ({"lat": sc.dry_lat, "lon": sc.dry_lon,
+                "maps": f"https://www.google.com/maps?q={sc.dry_lat},{sc.dry_lon}"} if sc.dry_lat else None)
+        assessment.insert(3, Item("Stan roślin z satelity (Sentinel-2)", detail, because,
+                                  "średnia" if sc.valid_share >= 0.8 else "niska", loc))
+    else:
+        assessment.insert(3, Item("Stan roślin z satelity (Sentinel-2)",
+                                  "Brak bezchmurnego zdjęcia działki z ostatnich 30 dni.",
+                                  ["Sentinel-2 przelatuje co 2–5 dni, ale chmury często zasłaniają pole"], "niska"))
+    if outlook:
+        why = [f"start: wyczerpanie {num(dr)} mm, próg stresu {num(raw)} mm",
+               f"pogoda z tych samych dni w {outlook.years} latach {weather.CLIMATE_YEARS[0]}–{weather.CLIMATE_YEARS[1]}",
+               "zakłada pogodę podobną do ostatnich lat; przy ocieplaniu się klimatu wynik może być zbyt optymistyczny"]
+        if outlook.forecast_days_used:
+            why.insert(2, f"pierwsze {outlook.forecast_days_used} dni z prognozy pogody")
+        assessment.append(Item(f"Co dalej: najbliższe {outlook.horizon_days} dni ({outlook.years} scenariuszy pogodowych)",
+                               outlook.summary + f" Ryzyko w najbliższych tygodniach: {outlook.level}.",
+                               why, "średnia"))
     if fc_p is not None:
         assessment.append(Item("Prognoza na 7 dni",
                                f"Opad ok. {num(fc_p)} mm, parowanie ok. {num(fc_e)} mm.",
@@ -288,6 +362,9 @@ def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date |
     if dr > raw:
         dose = dr - 0.2 * taw
         why = [f"wyczerpanie {num(dr)} mm > próg stresu {num(raw)} mm"]
+        if outlook:
+            why.append(f"by uniknąć stresu przez {outlook.horizon_days} dni: ok. {num(outlook.water_needed_p50_mm)} mm "
+                       f"(w suchym scenariuszu {num(outlook.water_needed_p90_mm)} mm)")
         if fc_p is not None and fc_p >= dr * 0.6:
             irrigation.append(Item(
                 "Wstrzymaj się z nawadnianiem",
@@ -316,18 +393,23 @@ def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date |
                 "rzadko się zwraca. Priorytetem jest retencja i agrotechnika.",
                 why, "średnia", priority=3))
     else:
-        irrigation.append(Item(
-            "Nawadnianie nie jest teraz potrzebne",
-            "Zapas wody w glebie jest powyżej progu stresu dla tej uprawy.",
-            [f"wyczerpanie {num(dr)} mm ≤ próg {num(raw)} mm"], "średnia", priority=3))
+        detail = "Zapas wody w glebie jest powyżej progu stresu dla tej uprawy."
+        why = [f"wyczerpanie {num(dr)} mm ≤ próg {num(raw)} mm"]
+        if outlook and outlook.p_stress_30 >= 0.5:
+            detail += (f" Ale w {int(round(outlook.p_stress_30 * outlook.years))} z {outlook.years} scenariuszy stres "
+                       f"pojawi się w ciągu {outlook.horizon_days} dni: zaplanuj działania z kroków 3–4 już teraz.")
+            why.append(f"woda potrzebna w {outlook.horizon_days} dni: ok. {num(outlook.water_needed_p50_mm)} mm "
+                       f"(w suchym scenariuszu {num(outlook.water_needed_p90_mm)} mm)")
+        irrigation.append(Item("Nawadnianie nie jest teraz potrzebne", detail, why, "średnia", priority=3))
 
     # --- Niepewność ----------------------------------------------------------------------
     uncertainty += [
         "Pogoda pochodzi z reanalizy (siatka ok. 9–25 km): lokalne burze mogą dać inny opad niż w modelu.",
         "Gleba z modelu SoilGrids (250 m) – docelowo mapa glebowo-rolnicza IUNG lub dane z badań gleby rolnika.",
         "Bilans wodny zakłada pełne uwilgotnienie gleby na początku okresu i miesięczne Kc wg FAO-56.",
-        "Brak jeszcze potwierdzenia satelitarnego stanu roślin (Sentinel-2 NDVI/NDMI) – w planie.",
+        "Wskaźniki satelitarne (NDVI, NDMI) oceniamy progami heurystycznymi; piksel 10–20 m, chmury mogą ograniczać dostępność zdjęć.",
         "Rowy i urządzenia melioracyjne nie są jeszcze uwzględnione (BDOT10k – w planie).",
+        "Scenariusze na 30 dni zakładają pogodę jak w latach 1995–2025; nie są prognozą konkretnej pogody.",
     ]
     if uncertainty_crop:
         uncertainty.insert(0, uncertainty_crop)
@@ -350,5 +432,9 @@ def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date |
              "wyczerpanie_mm": round(dr, 1), "TAW_mm": round(taw, 1), "RAW_mm": round(raw, 1), "Ks": round(ks, 2),
              "dni_stresu_30d": bal.stress_days, "lata_z_deficytem": deficit_years, "lata_referencyjne": n_years,
              "gleba": asdict(soil) if soil else None, "teren": asdict(terr) if terr else None,
+             "satelita": asdict(sat) if sat else None,
+             "scenariusze_pkt": {"p_stres_14": outlook.p_stress_14, "p_stres_30": outlook.p_stress_30}
+             if outlook else None,
              "wynik_ryzyka_pkt": score},
+        scenarios=asdict(outlook) if outlook else None,
     )

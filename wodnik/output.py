@@ -55,12 +55,12 @@ def text(r: Report) -> str:
 def geojson(r: Report) -> dict:
     feats = [{"type": "Feature", "geometry": r.parcel["geometria_wgs84"],
               "properties": {"rodzaj": "dzialka", "id": r.parcel["id"], "ryzyko": r.risk_level}}]
-    for group in (r.retention,):
+    for kind, group in (("ocena", r.assessment), ("retencja", r.retention), ("agrotechnika", r.agrotechnics)):
         for it in group:
             if it.location:
                 feats.append({"type": "Feature",
                               "geometry": {"type": "Point", "coordinates": [it.location["lon"], it.location["lat"]]},
-                              "properties": {"rodzaj": "rekomendacja", "tytul": it.title, "opis": it.detail}})
+                              "properties": {"rodzaj": kind, "tytul": it.title, "opis": it.detail}})
     return {"type": "FeatureCollection", "features": feats}
 
 

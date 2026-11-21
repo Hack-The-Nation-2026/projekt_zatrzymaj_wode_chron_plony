@@ -5,3 +5,5 @@ __pycache__/
 wyniki/
 .vscode/
 web/node_modules
+web/dist/
+web/.vite/

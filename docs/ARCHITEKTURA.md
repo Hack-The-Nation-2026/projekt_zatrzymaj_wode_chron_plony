@@ -13,13 +13,13 @@ Dokument opisuje, jak jest zbudowany Wodnik dziś (prototyp danych w Pythonie) i
 ## Widok ogólny
 
 ```
- Przeglądarka (telefon / komputer)                  [plan]
+ Przeglądarka (telefon / komputer)
  ┌──────────────────────────────────────────────┐
  │  web/  – mapa (Leaflet), formularz, wyniki   │
  └───────────────────┬──────────────────────────┘
                      │ JSON przez HTTPS  (patrz API.md)
  ┌───────────────────▼──────────────────────────┐
- │  api/  – FastAPI                       [plan]│
+ │  api/  – FastAPI                             │
  │   • walidacja wejścia, zadania, cache wyników│
  │   • wywołuje wodnik.analysis.analyse()       │
  │   • wywołuje wodnik.ai_report  (opcjonalnie) │
@@ -47,7 +47,7 @@ projekt_zatrzymaj_wode_chron_plony/
 │   ├── UI.md               strony i makiety
 │   ├── API.md              zapytania do serwera
 │   └── RAPORT_AI.md        raport AI, prompt, zabezpieczenia
-├── wodnik/                 RDZEŃ (działa dziś)
+├── wodnik/                 RDZEŃ (działa)
 │   ├── __main__.py         wiersz poleceń: python -m wodnik
 │   ├── analysis.py         5 kroków KOWR, reguły, progi, niepewność
 │   ├── parcel.py           działka z ULDK (po ID lub punkcie)
@@ -58,15 +58,16 @@ projekt_zatrzymaj_wode_chron_plony/
 │   ├── crops.py            Kc, korzenie, okresy krytyczne
 │   ├── http.py             pobieranie + cache + tryb offline
 │   ├── output.py           raport tekstowy i GeoJSON
+│   ├── satellite.py        Sentinel-2: NDVI, NDMI, najsuchsze miejsce
 │   └── ai_report.py        [plan] raport AI
-├── api/                    [plan] serwer FastAPI
+├── api/                    serwer FastAPI (działa: main.py)
 │   ├── main.py             aplikacja, CORS, obsługa błędów
 │   ├── routes.py           endpointy (patrz API.md)
 │   ├── schemas.py          modele Pydantic = kontrakt z frontem
 │   └── jobs.py             zadania w tle + postęp
-├── web/                    [plan] interfejs (patrz UI.md)
+├── web/                    podstawowy interfejs (działa: index.html, app.js, style.css)
 ├── tests/                  [plan] testy reguł i bilansu na stałych danych
-└── demo/                   [plan] 2–3 działki przeliczone wcześniej (JSON)
+└── demo/                   gotowe wyniki działek demo (JSON + GeoJSON)
 ```
 
 ## Rdzeń: przepływ jednej analizy

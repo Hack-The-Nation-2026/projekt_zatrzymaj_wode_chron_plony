@@ -1,5 +1,56 @@
 import React, { useState, useRef, useEffect } from "react";
+import { Document, Page, Text, View, StyleSheet, Font, pdf } from "@react-pdf/renderer";
 import "./styles.css";
+
+Font.register({
+  family: "Inter",
+  fonts: [
+    { src: "/fonts/Inter-Regular.ttf" },
+    { src: "/fonts/Inter-Bold.ttf", fontWeight: 700 },
+  ],
+});
+
+const s = StyleSheet.create({
+  page: { padding: 36, fontFamily: "Inter", fontSize: 10, color: "#1a2a1f" },
+  header: { flexDirection: "row", justifyContent: "space-between", marginBottom: 16,
+            borderBottomWidth: 2, borderBottomColor: "#4a9d3f", paddingBottom: 8 },
+  title: { fontSize: 20, fontWeight: 700 },
+  badge: { backgroundColor: "#fff3cd", color: "#8a6d00", padding: "3 8", borderRadius: 10 },
+  row: { flexDirection: "row", gap: 12, marginBottom: 12 },
+  card: { flex: 1, borderWidth: 1, borderColor: "#d8e0da", borderRadius: 6, padding: 10 },
+  cardLabel: { fontSize: 8, color: "#667", textTransform: "uppercase", marginBottom: 4 },
+  step: { borderLeftWidth: 3, borderLeftColor: "#4a9d3f", paddingLeft: 8, marginBottom: 8 },
+});
+
+const ReportPdf = ({ report }) => (
+  <Document>
+    <Page size="A4" style={s.page}>
+      <View style={s.header}>
+        <Text style={s.title}>Raport niedoborów</Text>
+        <Text style={s.badge}>Ryzyko suszy: {report.risk_level}</Text>
+      </View>
+      <View style={s.row}>
+        <View style={s.card}>
+          <Text style={s.cardLabel}>Główne przyczyny</Text>
+          <Text>{report.main_cause}</Text>
+          <Text>{report.secondary_cause}</Text>
+        </View>
+        <View style={s.card}>
+          <Text style={s.cardLabel}>Bilans wodny (FAO-56 / ERA5)</Text>
+          <Text>KBW (60 dni): {report.raw.kbw60_mm}</Text>
+          <Text>Wyczerpanie: {report.raw.depletion_mm} / TAW {report.raw.taw_mm}</Text>
+        </View>
+      </View>
+      {report.recommendations.map((r) => (
+        <View key={r.step} style={s.step} wrap={false}>
+          <Text>{r.step}</Text>
+          <Text style={{ fontWeight: 700 }}>{r.title}</Text>
+          <Text>{r.detail}</Text>
+        </View>
+      ))}
+    </Page>
+  </Document>
+);
 
 
 // --- LISTA UPRAW (jako klocki z kategoriami jak na screenie 2) ---
@@ -123,101 +174,11 @@ export default function App() {
 
 
   //Pobieranie raportu
-  const handleDownloadReport = () => {
+  const handleDownloadReport = async () => {
     if (!report) return;
-
-    const toAscii = (str = "") =>
-      String(str)
-        .replace(/ą/g, "a").replace(/Ą/g, "A")
-        .replace(/ć/g, "c").replace(/Ć/g, "C")
-        .replace(/ę/g, "e").replace(/Ę/g, "E")
-        .replace(/ł/g, "l").replace(/Ł/g, "L")
-        .replace(/ń/g, "n").replace(/Ń/g, "N")
-        .replace(/ó/g, "o").replace(/Ó/g, "O")
-        .replace(/ś/g, "s").replace(/Ś/g, "S")
-        .replace(/ź/g, "z").replace(/Ź/g, "Z")
-        .replace(/ż/g, "z").replace(/Ż/g, "Z")
-        .replace(/[–—]/g, "-")
-        .replace(/↳/g, "->")
-        .replace(/[^\x20-\x7E]/g, "");
-
-    const wrap = (text, max = 82) => {
-      const words = toAscii(text).split(/\s+/);
-      const out = [];
-      let cur = "";
-      for (const w of words) {
-        if ((cur + " " + w).trim().length > max) {
-          out.push(cur.trim());
-          cur = w;
-        } else {
-          cur = (cur + " " + w).trim();
-        }
-      }
-      if (cur) out.push(cur);
-      return out;
-    };
-
-    const lines = [
-      "RAPORT NIEDOBOROW - WODNIK",
-      "----------------------------------------------------------------------------------",
-      `Dzialka: ${toAscii(report.parcel.id)} (${toAscii(report.parcel.region)})`,
-      `Uprawa (plon): ${toAscii(report.crop.name)}`,
-      `Data sprawdzenia: ${toAscii(report.date)}`,
-      `Ryzyko suszy: ${toAscii(report.risk_level)} (pewnosc: ${toAscii(report.confidence)})`,
-      "",
-      "OCENA SYTUACJI WODNEJ:",
-      ...wrap(report.risk_summary),
-      "",
-      "GLOWNE PRZYCZYNY:",
-      ...wrap(`- ${report.main_cause}`),
-      ...wrap(`- ${report.secondary_cause}`),
-      "",
-      "BILANS WODNY (FAO-56 / ERA5):",
-      ...wrap(`KBW (60 dni): ${report.raw.kbw60_mm} | Wyczerpanie: ${report.raw.depletion_mm} / TAW ${report.raw.taw_mm}`),
-      ...wrap(`Tlo wieloletnie: ${report.raw.percentile}`),
-      "",
-      "ZALECENIA (SCIEZKA KOWR):",
-      ...report.recommendations.flatMap((r) => [
-        ...wrap(`${r.step}: ${r.title} [pewnosc: ${r.confidence}]`),
-        ...wrap(`   ${r.detail}`),
-      ]),
-    ];
-
-    const esc = (s) => s.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
-    const stream = [
-      "BT",
-      "/F1 11 Tf",
-      "15 TL",
-      "48 790 Td",
-      ...lines.map((line, i) => (i === 0 ? `(${esc(line)}) Tj` : `T* (${esc(line)}) Tj`)),
-      "ET",
-    ].join("\n");
-
-    const objs = [
-      "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
-      "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
-      "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n",
-      "4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
-      `5 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}\nendstream\nendobj\n`,
-    ];
-
-    let pdf = "%PDF-1.4\n";
-    const offsets = [0];
-    for (const o of objs) {
-      offsets.push(pdf.length);
-      pdf += o;
-    }
-    const xrefPos = pdf.length;
-    pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
-    for (let i = 1; i < offsets.length; i++) {
-      pdf += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
-    }
-    pdf += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF`;
-
-    const cropSlug = toAscii(report.crop.name).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+    const cropSlug = report.crop.key || report.crop.name.toLowerCase().replace(/\s+/g, "_");
     const checkDate = report.date || new Date().toISOString().slice(0, 10);
-
-    const blob = new Blob([pdf], { type: "application/pdf" });
+    const blob = await pdf(<ReportPdf report={report} />).toBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -232,8 +193,43 @@ export default function App() {
     return matchesCategory && matchesSearch;
   });
 
+  // Drukowanie raportu jako PDF
+  const handlePrintReport = async () => {
+    if (!report) return;
 
-  
+    const blob = await pdf(<ReportPdf report={report} />).toBlob();
+    const url = URL.createObjectURL(blob);
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "1px";   // nie 0 – część przeglądarek wtedy nie drukuje
+    iframe.style.height = "1px";
+    iframe.style.border = "0";
+    iframe.style.opacity = "0";
+    iframe.src = url;
+
+    iframe.onload = () => {
+      try {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      } catch (e) {
+        // Fallback: otwórz PDF w nowej karcie, użytkownik wydrukuje stamtąd
+        window.open(url, "_blank");
+      }
+    };
+
+    document.body.appendChild(iframe);
+
+    // Sprzątanie po dłuższej chwili (dialog druku jest asynchroniczny)
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      iframe.remove();
+    }, 60000);
+  };
+
+
   const selectedCropObj = CROPS.find((c) => c.key === selectedCropKey);
 
   // VIEW
@@ -428,7 +424,7 @@ export default function App() {
                 <div style={{ padding: "24px 0", textAlign: "center" }}>
                   <h2>Generowanie raportu niedoborów…</h2>
                   <p className="sub" style={{ marginBottom: 0 }}>
-                    Pobieranie danych GUGiK ULDK/NMT, ERA5-Land oraz SoilGrids (dummy API)…
+                    Pobieranie danych GUGiK ULDK/NMT, ERA5-Land oraz SoilGrids…
                   </p>
                 </div>
               ) : (
@@ -450,9 +446,20 @@ export default function App() {
                         Ryzyko suszy: {report.risk_level} (pewność: {report.confidence})
                       </span>
                     </div>
-                    <p style={{ fontSize: 14, color: "#333", margin: "0 0 12px" }}>
-                      {report.risk_summary}
-                    </p>
+                    <div
+                      style={{
+                        backgroundColor: "#ffffff",
+                        color: "#141413",
+                        padding: "14px 18px",
+                        borderRadius: "12px",
+                        margin: "0 0 16px",
+                        fontSize: 14,
+                        lineHeight: 1.5,
+                        boxShadow: "0 2px 8px rgba(0, 0, 0, 0.18)",
+                      }}
+                    >
+                      <strong>Podsumowanie ryzyka:</strong> {report.risk_summary}
+                    </div>
 
                     {/* Zwięzłe podsumowanie danych i ścieżki KOWR */}
                     <div className="grid-2" style={{ marginTop: 16 }}>
@@ -492,7 +499,7 @@ export default function App() {
                       </span>
                     </div>
                     <div style={{ display: "flex", gap: 10 }}>
-                      <button className="btn" onClick={() => window.print()}>
+                      <button className="btn" onClick={handlePrintReport}>
                         Drukuj
                       </button>
                       <button className="btn dark" onClick={handleDownloadReport}>

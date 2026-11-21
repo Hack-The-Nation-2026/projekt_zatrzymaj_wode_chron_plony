@@ -5,3 +5,4 @@ __pycache__/
 wyniki/
 .vscode/
 web/node_modules
+web/.vite

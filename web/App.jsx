@@ -140,16 +140,30 @@ function ParcelMap({ parcel, initialCenter, onPickPoint }) {
   const mapElRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const parcelLayerRef = useRef(null);
+  const [placeQuery, setPlaceQuery] = useState("");
+  const [placeResults, setPlaceResults] = useState([]);
+  const [placeLoading, setPlaceLoading] = useState(false);
+  const [placeError, setPlaceError] = useState("");
 
   useEffect(() => {
     const L = window.L;
     if (!L || !mapElRef.current || mapInstanceRef.current) return;
 
-    const map = L.map(mapElRef.current, { zoomControl: true }).setView(initialCenter || [51.545, 19.9493], 15);
+    const map = L.map(mapElRef.current, { zoomControl: true }).setView(initialCenter || [52.069, 19.48], 13);
+
     const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: "© OpenStreetMap",
     });
+    const hybrid = L.layerGroup([
+      L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+        maxZoom: 19,
+        attribution: "Satelita © Esri",
+      }),
+      L.tileLayer("https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", {
+        maxZoom: 19,
+      }),
+    ]);
     const orto = L.tileLayer.wms("https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMS/StandardResolution", {
       layers: "Raster",
       format: "image/jpeg",
@@ -165,9 +179,13 @@ function ParcelMap({ parcel, initialCenter, onPickPoint }) {
       attribution: "Działki © GUGiK",
     });
 
-    orto.addTo(map);
+    // Domyślnie OpenStreetMap + nakładka granic działek GUGiK
+    osm.addTo(map);
     parcels.addTo(map);
-    L.control.layers({ "Zdjęcie lotnicze": orto, "Mapa": osm }, { "Granice działek": parcels }).addTo(map);
+    L.control.layers(
+      { "OpenStreetMap": osm, "Satelita + nazwy miejsc": hybrid, "Ortofotomapa GUGiK": orto },
+      { "Granice i numery działek": parcels }
+    ).addTo(map);
 
     map.on("click", (e) => {
       onPickPoint(e.latlng.lat.toFixed(6), e.latlng.lng.toFixed(6));
@@ -175,6 +193,20 @@ function ParcelMap({ parcel, initialCenter, onPickPoint }) {
 
     mapInstanceRef.current = map;
     setTimeout(() => map.invalidateSize(), 100);
+
+    // Jeśli użytkownik nie wybrał jeszcze działki, spróbuj wycentrować mapę na jego lokalizacji
+    if (!parcel && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          if (mapInstanceRef.current && !parcelLayerRef.current) {
+            mapInstanceRef.current.setView([latitude, longitude], 16);
+          }
+        },
+        () => {},
+        { enableHighAccuracy: false, timeout: 5000 }
+      );
+    }
 
     return () => {
       map.remove();
@@ -195,19 +227,128 @@ function ParcelMap({ parcel, initialCenter, onPickPoint }) {
 
     if (parcel?.geometry) {
       const layer = L.geoJSON(parcel.geometry, {
-        style: { color: "#e8b13a", weight: 3, fillOpacity: 0.15 },
+        style: { color: "#e8b13a", weight: 3, fillOpacity: 0.2 },
       }).addTo(map);
       parcelLayerRef.current = layer;
       map.fitBounds(layer.getBounds(), { maxZoom: 17, padding: [24, 24] });
     }
   }, [parcel]);
 
+  const handleSearchPlace = async (e) => {
+    if (e) e.preventDefault();
+    const q = placeQuery.trim();
+    if (!q) return;
+    setPlaceLoading(true);
+    setPlaceError("");
+    setPlaceResults([]);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&countrycodes=pl&limit=5&q=${encodeURIComponent(q)}`;
+      const res = await fetch(url, { headers: { "Accept-Language": "pl" } });
+      const data = await res.json();
+      if (!data.length) {
+        setPlaceError("Nie znaleziono takiej miejscowości lub adresu.");
+      } else if (data.length === 1) {
+        flyToPlace(data[0]);
+      } else {
+        setPlaceResults(data);
+      }
+    } catch {
+      setPlaceError("Błąd wyszukiwania miejscowości.");
+    } finally {
+      setPlaceLoading(false);
+    }
+  };
+
+  const flyToPlace = (item) => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const lat = parseFloat(item.lat);
+    const lon = parseFloat(item.lon);
+    map.setView([lat, lon], 16);
+    setPlaceResults([]);
+  };
+
+  const handleMyLocation = () => {
+    if (!navigator.geolocation) {
+      setPlaceError("Przeglądarka nie obsługuje geolokalizacji.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        mapInstanceRef.current?.setView([pos.coords.latitude, pos.coords.longitude], 16);
+        setPlaceError("");
+      },
+      () => setPlaceError("Nie udało się pobrać lokalizacji (sprawdź uprawnienia przeglądarki).")
+    );
+  };
+
   return (
     <div style={{ marginTop: 14 }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <input
+          placeholder="Szukaj miejscowości lub adresu (np. Łazisko, Tomaszów Maz.)"
+          value={placeQuery}
+          onChange={(e) => setPlaceQuery(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSearchPlace(e)}
+          style={{ flex: 1, height: 38, fontSize: 13 }}
+        />
+        <button
+          type="button"
+          className="btn dark"
+          style={{ height: 38, padding: "0 14px", fontSize: 13 }}
+          onClick={handleSearchPlace}
+          disabled={placeLoading}
+        >
+          {placeLoading ? "Szukam…" : "Szukaj"}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          style={{ height: 38, padding: "0 12px", fontSize: 13 }}
+          onClick={handleMyLocation}
+          title="Wyśrodkuj na mojej lokalizacji"
+        >
+          📍
+        </button>
+      </div>
+
+      {placeError && (
+        <div style={{ fontSize: 12, color: "#ff8a80", marginBottom: 8 }}>{placeError}</div>
+      )}
+
+      {placeResults.length > 0 && (
+        <div
+          style={{
+            background: "#0a1620",
+            border: "1px solid #2c465d",
+            borderRadius: 10,
+            marginBottom: 8,
+            maxHeight: 150,
+            overflowY: "auto",
+          }}
+        >
+          {placeResults.map((item) => (
+            <div
+              key={item.place_id}
+              onClick={() => flyToPlace(item)}
+              style={{
+                padding: "8px 12px",
+                fontSize: 12,
+                color: "#d3dfe8",
+                borderBottom: "1px solid #1b2e3f",
+                cursor: "pointer",
+              }}
+            >
+              📍 {item.display_name}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div
         ref={mapElRef}
         style={{
-          height: 300,
+          height: 320,
           width: "100%",
           borderRadius: 10,
           border: "1px solid #2c465d",
@@ -215,7 +356,7 @@ function ParcelMap({ parcel, initialCenter, onPickPoint }) {
         }}
       />
       <div style={{ fontSize: 12, color: "#9db0c0", marginTop: 6 }}>
-        Dotknij dowolnego pola na mapie, aby pobrać granice działki z GUGiK ULDK.
+        Przybliż mapę (zoom ≥ 15), aby zobaczyć granice działek, i kliknij swoją działkę.
       </div>
     </div>
   );

@@ -58,6 +58,30 @@ CROPS = {
 }
 
 
+# --- Interpretacja zdjęć satelitarnych zależna od uprawy -------------------------------------------
+# Orientacyjny zakres NDVI dobrze rozwiniętej, nieprzesuszonej uprawy w danym miesiącu (min, max)
+# oraz miesiące naturalnego dojrzewania/zbioru, gdy spadek zieloności NIE oznacza suszy.
+# Wartości heurystyczne na podstawie typowych krzywych NDVI dla upraw w Europie Środkowej
+# (Sentinel-2); do kalibracji z danymi referencyjnymi (np. z ekspertami KOWR / IUNG).
+NDVI_EXPECTED = {
+    "pszenica_ozima": {4: (0.45, 0.80), 5: (0.65, 0.90), 6: (0.55, 0.85)},
+    "pszenica_jara": {5: (0.40, 0.75), 6: (0.60, 0.88)},
+    "zyto": {4: (0.45, 0.80), 5: (0.60, 0.88), 6: (0.50, 0.80)},
+    "jeczmien_jary": {5: (0.40, 0.75), 6: (0.60, 0.88)},
+    "rzepak_ozimy": {4: (0.55, 0.85), 5: (0.55, 0.85)},
+    "kukurydza": {7: (0.60, 0.88), 8: (0.65, 0.90)},
+    "ziemniaki": {6: (0.45, 0.80), 7: (0.65, 0.90), 8: (0.55, 0.85)},
+    "burak_cukrowy": {6: (0.45, 0.80), 7: (0.65, 0.90), 8: (0.70, 0.92), 9: (0.65, 0.90)},
+    "uzytki_zielone": {5: (0.60, 0.88), 6: (0.55, 0.88), 7: (0.50, 0.85), 8: (0.50, 0.85)},
+}
+SENESCENCE = {  # miesiące dojrzewania i zbioru: spadek NDVI jest wtedy naturalny
+    "pszenica_ozima": (7, 8), "pszenica_jara": (7, 8), "zyto": (7, 8), "jeczmien_jary": (7, 8),
+    "rzepak_ozimy": (6, 7), "kukurydza": (9, 10), "ziemniaki": (8, 9), "burak_cukrowy": (10,),
+    "uzytki_zielone": (),  # spadek po pokosie możliwy w maju–wrześniu
+}
+MOWING_POSSIBLE = {"uzytki_zielone": (5, 6, 7, 8, 9)}
+
+
 def get(key: str) -> Crop:
     try:
         return CROPS[key]

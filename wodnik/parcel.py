@@ -71,3 +71,8 @@ def by_point(lat: float, lon: float) -> Parcel:
 def to_latlon(x: float, y: float) -> tuple[float, float]:
     lon, lat = _TO_WGS84.transform(x, y)
     return lat, lon
+
+
+def to_pl92(lat: float, lon: float) -> tuple[float, float]:
+    """WGS84 → PUWG 1992 (EPSG:2180): zwraca (x, y) w metrach."""
+    return _TO_PL92.transform(lon, lat)

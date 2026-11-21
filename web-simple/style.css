@@ -83,3 +83,17 @@ details.stage > summary::-webkit-details-marker { display: none; }
 .note { font-size: 14px; color: var(--muted); }
 .note ul { padding-left: 18px; margin: 6px 0; }
 .foot { color: var(--muted); font-size: 12px; margin-top: 16px; }
+
+/* konto i historia */
+.account .row { align-items: center; justify-content: space-between; gap: 8px; }
+.account form { margin: 0; }
+.history { list-style: none; padding: 0; margin: 8px 0 0; }
+.history li { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-top: 1px solid #0001; }
+.history li > button:first-child { flex: 1; text-align: left; }
+
+/* wykresy */
+.charts h3 { margin: 4px 0 6px; }
+.chart-tabs { display: flex; gap: 6px; margin-bottom: 6px; }
+.chart-tabs button { min-height: auto; padding: 6px 10px; border-radius: 999px; border: 1px solid #0002; background: none; cursor: pointer; }
+.chart-tabs button.on { background: var(--blue); color: #fff; border-color: var(--blue); }
+.charts .wodnik-chart { --chart-font: 14px; }

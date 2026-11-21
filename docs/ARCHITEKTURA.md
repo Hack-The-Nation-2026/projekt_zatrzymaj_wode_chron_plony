@@ -51,7 +51,7 @@ projekt_zatrzymaj_wode_chron_plony/
 │   ├── __main__.py         wiersz poleceń: python -m wodnik
 │   ├── analysis.py         5 kroków KOWR, reguły, progi, niepewność
 │   ├── parcel.py           działka z ULDK (po ID lub punkcie)
-│   ├── weather.py          opad, ET0, wilgotność gleby, tło 1995–2025
+│   ├── weather.py          opad, ET0, wilgotność gleby, tło 10 lat przed datą
 │   ├── waterbalance.py     bilans FAO-56 (TAW, RAW, Ks)
 │   ├── soil.py             SoilGrids + Saxton & Rawls
 │   ├── terrain.py          NMT: spadki, spływ, zagłębienia
@@ -59,6 +59,7 @@ projekt_zatrzymaj_wode_chron_plony/
 │   ├── http.py             pobieranie + cache + tryb offline
 │   ├── output.py           raport tekstowy i GeoJSON
 │   ├── satellite.py        Sentinel-2: NDVI, NDMI, najsuchsze miejsce
+│   ├── hydrology.py        BDOT10k: rowy, cieki, zbiorniki, mokradła, lasy
 │   └── ai_report.py        [plan] raport AI
 ├── api/                    serwer FastAPI (działa: main.py)
 │   ├── main.py             aplikacja, CORS, obsługa błędów
@@ -77,7 +78,7 @@ Funkcja `wodnik.analysis.analyse(parcel_id | point, on, crop_key)`:
 | # | Krok | Moduł | Wynik |
 |---|---|---|---|
 | 1 | działka | `parcel` | geometria, powierzchnia, gmina |
-| 2 | pogoda + tło wieloletnie | `weather` | szereg 150 dni + percentyle z 31 lat |
+| 2 | pogoda + tło wieloletnie | `weather` | szereg 150 dni + percentyle z 10 lat |
 | 3 | gleba | `soil` | uziarnienie, próchnica, pojemność wodna |
 | 4 | teren | `terrain` | spadki, punkty odpływu, zagłębienia, dopływ z zewnątrz |
 | 5 | bilans wody | `waterbalance` | wyczerpanie, próg stresu, dni stresu |

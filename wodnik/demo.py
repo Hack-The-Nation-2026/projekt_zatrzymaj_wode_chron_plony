@@ -30,6 +30,8 @@ def _clean(obj):
     return obj
 
 
+_PL = str.maketrans("ąćęłńóśźż", "acelnoszz")
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="wodnik.demo", description=__doc__.splitlines()[0])
     ap.add_argument("--dzialka", required=True)
@@ -40,7 +42,8 @@ def main(argv=None) -> int:
 
     on = date.fromisoformat(a.data)
     rep = analysis.analyse(parcel_id=a.dzialka, on=on, crop_key=a.uprawa)
-    slug = re.sub(r"[^a-z0-9]+", "_", f"{rep.parcel['obreb']}_{a.dzialka.split('.')[-1]}_{on}".lower()).strip("_")
+    name = f"{rep.parcel['obreb']}_{a.dzialka.split('.')[-1]}_{on}".lower().translate(_PL)
+    slug = re.sub(r"[^a-z0-9]+", "_", name).strip("_")
     title = a.tytul or f"{rep.parcel['obreb']}, {rep.crop}, {on.strftime('%d.%m.%Y')}"
     DEMO_DIR.mkdir(exist_ok=True)
     body = {"request": {"parcel_id": a.dzialka, "date": on.isoformat(), "crop": a.uprawa},

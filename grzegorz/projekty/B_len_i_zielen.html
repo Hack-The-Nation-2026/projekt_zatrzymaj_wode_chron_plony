@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Wodnik – wariant B: len i zieleń</title>
+</head>
+<body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#f2f5f0}
+a{color:#1d5f9a}a:hover{color:#123f68}
+</style>
+<div style="font-family: Inter, system-ui, sans-serif; color: #12261c; background: #f2f5f0; min-height: 100vh">
+
+<header style="max-width: 1240px; margin: 0 auto; padding: 22px 24px; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; border-bottom: 1px solid #d6dfd3">
+<div style="display: flex; align-items: center; gap: 10px; font-family: Manrope, Inter, sans-serif; font-weight: 800; font-size: 22px; color: #12261c">
+<svg width="22" height="28" viewBox="0 0 22 28" aria-hidden="true"><path d="M11 1C11 1 1 14 1 19a10 10 0 0020 0C21 14 11 1 11 1z" fill="#1d5f9a"></path></svg>
+Wodnik
+</div>
+<nav style="display: flex; align-items: center; gap: 24px; font-size: 15px; flex-wrap: wrap">
+<a href="#kroki" style="color: #33493c; text-decoration: none">Jak to działa</a>
+<a href="#liczby" style="color: #33493c; text-decoration: none">Problem</a>
+<a href="#model-b" style="color: #33493c; text-decoration: none">Model</a>
+</nav>
+</header>
+
+<section style="max-width: 1240px; margin: 0 auto; padding: 48px 24px 32px; display: flex; flex-wrap: wrap; gap: 40px; align-items: stretch">
+<div style="flex: 999 1 560px; display: flex; flex-direction: column; gap: 24px">
+<div style="display: flex; flex-direction: column; gap: 16px">
+<p style="margin: 0; color: #2f6b2a; font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase">Doradca wodny w telefonie</p>
+<h1 style="margin: 0; font-family: Manrope, Inter, sans-serif; font-size: 58px; line-height: 1.04; letter-spacing: -0.03em; font-weight: 800">Każda kropla<br>zostaje na Twoim polu</h1>
+<p style="margin: 0; font-size: 19px; line-height: 1.6; color: #33493c; max-width: 600px">Wodnik łączy pogodę z dziesięciu lat, glebę, ukształtowanie terenu i zdjęcia satelitarne, żeby powiedzieć prosto: czy brakuje wody, dlaczego i co zrobić najpierw.</p>
+</div>
+<img src="../../web/public/img/rolnik-pole.jpg" alt="Rolnik na skraju pola pszenicy o zachodzie słońca sprawdza w telefonie mapę działki" style="width: 100%; height: 420px; object-fit: cover; object-position: left center; border-radius: 28px; display: block">
+</div>
+<div style="flex: 1 1 340px; display: flex; flex-direction: column; gap: 16px">
+<form style="background: #ffffff; border: 1px solid #d6dfd3; border-radius: 24px; padding: 28px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); background: #e8eee5; border-radius: 999px; padding: 4px; margin-bottom: 8px">
+<button type="button" style="height: 40px; border: 0; border-radius: 999px; background: #2f6b2a; color: #ffffff; font-weight: 700; font-size: 14px">Logowanie</button>
+<button type="button" style="height: 40px; border: 0; border-radius: 999px; background: transparent; color: #33493c; font-weight: 600; font-size: 14px">Załóż konto</button>
+</div>
+<label for="b-email" style="font-size: 13px; font-weight: 600; color: #33493c">E-mail</label>
+<input id="b-email" type="email" placeholder="jan@gospodarstwo.pl" style="height: 48px; border: 1px solid #c3cfbf; border-radius: 14px; padding: 0 14px; font-size: 15px; background: #fbfcfa">
+<label for="b-haslo" style="font-size: 13px; font-weight: 600; color: #33493c">Hasło</label>
+<input id="b-haslo" type="password" style="height: 48px; border: 1px solid #c3cfbf; border-radius: 14px; padding: 0 14px; font-size: 15px; background: #fbfcfa">
+<button type="button" style="height: 50px; margin-top: 8px; border: 0; border-radius: 14px; background: #2f6b2a; color: #ffffff; font-size: 16px; font-weight: 700">Zaloguj się</button>
+<a href="#kroki" style="text-align: center; font-size: 14px; font-weight: 600; margin-top: 4px">Sprawdź pole bez konta →</a>
+</form>
+<div style="background: #12261c; color: #f2f5f0; border-radius: 24px; padding: 24px; display: flex; flex-direction: column; gap: 10px; flex-grow: 1">
+<p style="margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #a9d39b">Przykładowy wynik</p>
+<p style="margin: 0; font-family: Manrope, Inter, sans-serif; font-size: 22px; font-weight: 700; line-height: 1.3">Łazisko: przy ulewie 50 mm spłynie ok. 1026 m³ wody. Zatrzyma ją ok. 433 m niskiego wału.</p>
+<p style="margin: 0; font-size: 14px; color: #c9d8c4">Pszenica ozima · 15.06.2026 · rośliny w stresie wodnym</p>
+</div>
+</div>
+</section>
+
+<section id="liczby" style="max-width: 1240px; margin: 0 auto; padding: 32px 24px">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); border-top: 1px solid #c3cfbf; border-bottom: 1px solid #c3cfbf">
+<div style="padding: 28px 20px; display: flex; flex-direction: column; gap: 6px"><b style="font-family: Manrope, Inter, sans-serif; font-size: 40px; color: #1d5f9a">4,36 mld zł</b><span style="color: #33493c">pomocy po suszach 2018–2019</span></div>
+<div style="padding: 28px 20px; display: flex; flex-direction: column; gap: 6px"><b style="font-family: Manrope, Inter, sans-serif; font-size: 40px; color: #1d5f9a">7,5%</b><span style="color: #33493c">odpływu zatrzymujemy, a można ok. 15%</span></div>
+<div style="padding: 28px 20px; display: flex; flex-direction: column; gap: 6px"><b style="font-family: Manrope, Inter, sans-serif; font-size: 40px; color: #1d5f9a">ok. 1600 m³</b><span style="color: #33493c">wody na mieszkańca rocznie, jeden z najniższych wyników w UE</span></div>
+<div style="padding: 28px 20px; display: flex; flex-direction: column; gap: 6px"><b style="font-family: Manrope, Inter, sans-serif; font-size: 40px; color: #1d5f9a">1,32 mln</b><span style="color: #33493c">gospodarstw, każde z inną glebą</span></div>
+</div>
+<p style="margin: 10px 0 0; font-size: 13px; color: #4a5f51">Źródła: NIK P/21/048, GUS (raport SDG, Powszechny Spis Rolny 2020)</p>
+</section>
+
+<section id="kroki" style="max-width: 1240px; margin: 0 auto; padding: 56px 24px; display: flex; flex-wrap: wrap; gap: 48px">
+<div style="flex: 1 1 360px">
+<h2 style="margin: 0 0 14px; font-family: Manrope, Inter, sans-serif; font-size: 40px; line-height: 1.1; letter-spacing: -0.02em">Najpierw zatrzymaj wodę.<br>Nawadniaj na końcu.</h2>
+<p style="margin: 0; font-size: 17px; line-height: 1.65; color: #33493c">Kolejność rad jest taka, jak zaleca KOWR. Każda rada ma źródło i poziom pewności, a gdy brakuje danych, mówimy to wprost.</p>
+</div>
+<ol style="flex: 999 1 560px; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px">
+<li style="display: flex; gap: 16px; align-items: flex-start; background: #ffffff; border: 1px solid #d6dfd3; border-radius: 18px; padding: 18px 20px"><span style="flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; background: #2f6b2a; color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 700">1</span><div><h3 style="margin: 0 0 2px; font-size: 18px">Ocena sytuacji wodnej</h3><p style="margin: 0; color: #33493c">Zapas wody w strefie korzeni na tle dziesięciu ostatnich lat.</p></div></li>
+<li style="display: flex; gap: 16px; align-items: flex-start; background: #ffffff; border: 1px solid #d6dfd3; border-radius: 18px; padding: 18px 20px"><span style="flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; background: #2f6b2a; color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 700">2</span><div><h3 style="margin: 0 0 2px; font-size: 18px">Przyczyny</h3><p style="margin: 0; color: #33493c">Opad, gleba czy spływ: wskazujemy główną.</p></div></li>
+<li style="display: flex; gap: 16px; align-items: flex-start; background: #ffffff; border: 1px solid #d6dfd3; border-radius: 18px; padding: 18px 20px"><span style="flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; background: #2f6b2a; color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 700">3</span><div><h3 style="margin: 0 0 2px; font-size: 18px">Retencja</h3><p style="margin: 0; color: #33493c">Wał, pas zieleni, oczko: z miejscem na mapie i pojemnością.</p></div></li>
+<li style="display: flex; gap: 16px; align-items: flex-start; background: #ffffff; border: 1px solid #d6dfd3; border-radius: 18px; padding: 18px 20px"><span style="flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; background: #2f6b2a; color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 700">4</span><div><h3 style="margin: 0 0 2px; font-size: 18px">Agrotechnika</h3><p style="margin: 0; color: #33493c">Międzyplony, resztki pożniwne, uprawa ograniczająca parowanie.</p></div></li>
+<li style="display: flex; gap: 16px; align-items: flex-start; background: #ffffff; border: 1px solid #d6dfd3; border-radius: 18px; padding: 18px 20px"><span style="flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; background: #1d5f9a; color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 700">5</span><div><h3 style="margin: 0 0 2px; font-size: 18px">Nawadnianie</h3><p style="margin: 0; color: #33493c">Tylko gdy ma sens: kiedy i ile wody.</p></div></li>
+</ol>
+</section>
+
+<section id="model-b" style="max-width: 1240px; margin: 0 auto; padding: 40px 24px 80px">
+<div style="background: #e3ece0; border-radius: 28px; padding: 40px; display: flex; flex-wrap: wrap; gap: 32px">
+<div style="flex: 1 1 320px"><h2 style="margin: 0; font-family: Manrope, Inter, sans-serif; font-size: 34px; letter-spacing: -0.02em">Darmowe dla rolnika, opłacalne dla państwa</h2></div>
+<div style="flex: 999 1 560px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px">
+<div><h3 style="margin: 0 0 6px; font-size: 17px; color: #2f6b2a">Dla kogo</h3><p style="margin: 0; color: #33493c">Rolnicy bezpłatnie; doradcy ODR, gminy i spółki wodne.</p></div>
+<div><h3 style="margin: 0 0 6px; font-size: 17px; color: #2f6b2a">Kanały</h3><p style="margin: 0; color: #33493c">KOWR i ośrodki doradztwa rolniczego.</p></div>
+<div><h3 style="margin: 0 0 6px; font-size: 17px; color: #2f6b2a">Koszty</h3><p style="margin: 0; color: #33493c">Dane publiczne bez opłat; utrzymanie: [__ tys. zł rocznie].</p></div>
+</div>
+</div>
+</section>
+
+<footer style="border-top: 1px solid #d6dfd3; padding: 28px 24px; text-align: center; color: #4a5f51; font-size: 14px">Wodnik · HackNation 2026 · rady warto omówić z doradcą rolniczym (ODR)</footer>
+</div>
+</body>
+</html>

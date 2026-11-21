@@ -3,6 +3,11 @@ import { Document, Page, Text, View, StyleSheet, Font, pdf } from "@react-pdf/re
 import "./styles.css";
 import { api } from "./api.js";
 import Scenarios from "./Scenarios.jsx";
+import { HistoryChart, YearsChart } from "./Charts.jsx";
+import Chat from "./Chat.jsx";
+import WhatIf from "./WhatIf.jsx";
+import Landing from "./Landing.jsx";
+import Profile from "./Profile.jsx";
 
 Font.register({
   family: "Roboto",
@@ -221,27 +226,17 @@ function ParcelMap({ parcel, initialCenter, onPickPoint }) {
   );
 }
 
-// RESET
-// Pełny reset: czyści też pola formularza, wybraną uprawę i datę
-const handleRestart = () => {
-  setParcelInput("");
-  setLatInput("");
-  setLonInput("");
-  setShowMapPicker(false);
-  setSelectedParcel(null);
-  setCropSearch("");
-  setActiveCategory("Wszystkie");
-  setSelectedCropKey("pszenica_ozima");
-  setAnalysisDate(new Date().toISOString().slice(0, 10));
-  setReport(null);
-  setProgress([]);
-  setError("");
-  setLoadingReport(false);
-  topRef.current?.scrollIntoView({ behavior: "smooth" });
-};
-
-
 export default function App() {
+  // Konto: strona startowa z logowaniem, aplikacja, profil z historią raportów
+  const [user, setUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [guest, setGuest] = useState(false);
+  const [view, setView] = useState("app"); // "app" | "profile"
+
+  useEffect(() => {
+    api.me().then((u) => setUser(u)).finally(() => setAuthChecked(true));
+  }, []);
+
   // Stan kroku 1: Działka
   const [parcelInput, setParcelInput] = useState("");
   const [latInput, setLatInput] = useState("");
@@ -279,6 +274,44 @@ export default function App() {
       reportSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [loadingReport, report]);
+
+  // RESET
+  // Pełny reset: czyści też pola formularza, wybraną uprawę i datę
+  const handleRestart = () => {
+    setParcelInput("");
+    setLatInput("");
+    setLonInput("");
+    setShowMapPicker(false);
+    setSelectedParcel(null);
+    setCropSearch("");
+    setActiveCategory("Wszystkie");
+    setSelectedCropKey("pszenica_ozima");
+    setAnalysisDate(new Date().toISOString().slice(0, 10));
+    setReport(null);
+    setProgress([]);
+    setError("");
+    setLoadingReport(false);
+    setView("app");
+    topRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleLogout = async () => {
+    await api.logout();
+    setUser(null);
+    setGuest(false);
+    setView("app");
+    setReport(null);
+    setSelectedParcel(null);
+    window.scrollTo({ top: 0 });
+  };
+
+  // Raport otwarty z historii w profilu
+  const handleOpenReport = (r) => {
+    setError("");
+    setSelectedParcel(r.parcel);
+    setReport(r);
+    setView("app");
+  };
 
   const pickParcel = async (load) => {
     setError("");
@@ -327,6 +360,7 @@ export default function App() {
   const handleReset = () => {
     setSelectedParcel(null);
     setReport(null);
+    setView("app");
     topRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
@@ -377,6 +411,16 @@ export default function App() {
   const selectedCropObj = CROPS.find((c) => c.key === selectedCropKey);
 
   // VIEW
+  if (!authChecked) return null;
+  if (!user && !guest) {
+    return (
+      <Landing
+        onAuth={(u) => { setUser(u); setView("app"); window.scrollTo({ top: 0 }); }}
+        onGuest={() => { setGuest(true); window.scrollTo({ top: 0 }); }}
+      />
+    );
+  }
+
   return (
     <div ref={topRef}>
       <header className="topbar">
@@ -412,22 +456,49 @@ export default function App() {
     >
       Od nowa
     </button>
+    {user ? (
+      <>
+        <button className="btn" style={{ height: 38, padding: "0 16px" }} onClick={() => setView("profile")}
+                title={user.email}>
+          {user.name || "Moje konto"} · raporty
+        </button>
+        <button className="btn" style={{ height: 38, padding: "0 16px" }} onClick={handleLogout}>Wyloguj</button>
+      </>
+    ) : (
+      <button className="btn" style={{ height: 38, padding: "0 16px" }} onClick={() => setGuest(false)}>
+        Zaloguj się
+      </button>
+    )}
   </div>
 </header>
 
+      {view === "profile" && user ? (
+        <Profile user={user} onOpenReport={handleOpenReport} onBack={handleRestart} />
+      ) : (
+
       <main className="container">
+        {/* Pasek kroków: gdzie jestem w analizie */}
+        <ol className="stepper" aria-label="Kroki analizy">
+          <li className={selectedParcel ? "done" : "on"}><span>1</span>Twoje pole</li>
+          <li className={report ? "done" : selectedParcel ? "on" : ""}><span>2</span>Uprawa i data</li>
+          <li className={report ? "on" : ""}><span>3</span>Raport i rady</li>
+        </ol>
+
         {/* KROK 1: WYBÓR DZIAŁKI (widoczny od razu na starcie) */}
         <section className="section">
-          <div className="eyebrow">RETENCJA WODY W ROLNICTWIE</div>
-          <h1>Sprawdź możliwości retencji na swojej działce</h1>
-          <p className="sub">Wpisz numer ewidencyjny działki lub wybierz jej lokalizację, aby rozpocząć.</p>
+          <div className="eyebrow">{user?.name ? `Dzień dobry, ${user.name}` : "Krok 1 · Twoje pole"}</div>
+          <h1>Gdzie jest Twoje pole?</h1>
+          <p className="sub">
+            Wpisz numer działki z ewidencji albo wskaż pole na mapie. Resztę sprawdzimy za Ciebie: pogodę z ostatnich
+            10 lat, glebę, ukształtowanie terenu, rowy w okolicy i stan roślin ze zdjęć satelitarnych.
+          </p>
 
           <div className="grid-2">
             {/* Karta lewa: Numer ewidencyjny działki */}
             <div className="panel" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
               <div>
-                <h2>Numer ewidencyjny działki</h2>
-                <p className="sub" style={{ marginBottom: 16 }}>Znajdź działkę na podstawie jej identyfikatora.</p>
+                <h2>Mam numer działki</h2>
+                <p className="sub" style={{ marginBottom: 16 }}>Znajdziesz go w wypisie z ewidencji albo we wniosku o dopłaty.</p>
                 <label>Identyfikator działki</label>
                 <input
                   placeholder="np. 141201_1.0001.123/4"
@@ -443,8 +514,8 @@ export default function App() {
             {/* Karta prawa: Lokalizacja geograficzna */}
             <div className="panel" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
               <div>
-                <h2>Lokalizacja geograficzna</h2>
-                <p className="sub" style={{ marginBottom: 16 }}>Podaj współrzędne lub wskaż działkę na mapie.</p>
+                <h2>Pokażę na mapie</h2>
+                <p className="sub" style={{ marginBottom: 16 }}>Kliknij swoje pole na zdjęciu lotniczym albo wpisz współrzędne.</p>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   <div>
                     <label>Szerokość geograficzna</label>
@@ -492,9 +563,9 @@ export default function App() {
           </div>
 
           <p style={{ textAlign: "center", color: "#777770", fontSize: 13, marginTop: 28 }}>
-            Wystarczy jedna metoda — numer działki lub lokalizacja.{" "}
+            Nie masz pod ręką numeru?{" "}
             <span style={{ color: "#63b34e", cursor: "pointer", textDecoration: "underline" }} onClick={handleDemo}>
-              Wypróbuj na przykładzie (Łazisko, 15.06.2026)
+              Zobacz przykładowe pole w Łazisku (pszenica, 15.06.2026)
             </span>
           </p>
           {error && !selectedParcel && <p className="error-msg" role="alert">{error}</p>}
@@ -505,7 +576,7 @@ export default function App() {
           <section ref={cropSectionRef} className="section">
             <div className="panel" style={{ maxWidth: 680, margin: "0 auto", width: "100%" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <h2>Wybierz uprawę</h2>
+                <h2>Co rośnie na tym polu?</h2>
                 <span
                   style={{ fontSize: 13, color: "#666", cursor: "pointer" }}
                   onClick={() => topRef.current?.scrollIntoView({ behavior: "smooth" })}
@@ -592,10 +663,12 @@ export default function App() {
           <section ref={reportSectionRef} className="section">
             <div className="panel">
               {loadingReport ? (
-                <div style={{ padding: "24px 0", textAlign: "center" }}>
-                  <h2>Generowanie raportu niedoborów…</h2>
+                <div style={{ padding: "12px 0 24px", textAlign: "center" }}>
+                  <img className="loader-gif" src="/img/klos-ladowanie.gif" alt="" aria-hidden="true" width="380" height="252" />
+                  <h2>Sprawdzamy Twoje pole…</h2>
                   <p className="sub" style={{ marginBottom: 12 }}>
-                    Pobieranie danych GUGiK, ERA5, SoilGrids i Sentinel-2. Pierwsza analiza działki trwa do ok. minuty.
+                    Zbieramy dane o pogodzie, glebie, terenie i roślinach z kilku publicznych źródeł naraz.
+                    Nowe pole liczy się zwykle do minuty, a pole sprawdzane wcześniej od razu.
                   </p>
                   <ul className="progress-list">
                     {progress.map((s) => (
@@ -606,7 +679,7 @@ export default function App() {
               ) : (
                 <>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                    <h2>Raport niedoborów</h2>
+                    <h2>Twój raport</h2>
                     <span
                       style={{ fontSize: 13, color: "#555", cursor: "pointer", fontWeight: 600 }}
                       onClick={handleDownloadReport}
@@ -618,7 +691,8 @@ export default function App() {
                   <div style={{ marginBottom: 18 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
                       Stan niedoboru{" "}
-                      <span className="badge warn" style={{ marginLeft: 8 }}>
+                      <span className={`badge ${{ niskie: "ok", umiarkowane: "warn", wysokie: "bad" }[String(report.risk_level).toLowerCase()] || "warn"}`}
+                            style={{ marginLeft: 8 }}>
                         Ryzyko suszy: {report.risk_level} (pewność: {report.confidence})
                       </span>
                     </div>
@@ -634,7 +708,7 @@ export default function App() {
                         boxShadow: "0 2px 8px rgba(0, 0, 0, 0.18)",
                       }}
                     >
-                      <strong>Podsumowanie ryzyka:</strong> {report.risk_summary}
+                      <strong>W skrócie:</strong> {report.risk_summary}
                     </div>
 
                     {/* Zwięzłe podsumowanie danych i ścieżki KOWR */}
@@ -652,10 +726,13 @@ export default function App() {
                         <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
                           Tło wieloletnie: {report.raw.percentile}
                         </div>
+                        <YearsChart charts={report.charts} />
                       </div>
                     </div>
 
+                    <HistoryChart charts={report.charts} scenarios={report.scenarios} />
                     <Scenarios s={report.scenarios} />
+                    <WhatIf w={report.whatIf} />
 
                     <div className="rec-table-wrap">
                       <table className="rec-table">
@@ -690,6 +767,8 @@ export default function App() {
                         </tbody>
                       </table>
                     </div>
+
+                    <Chat report={report} />
                   </div>
 
                   {/* Stopka raportu identyczna jak na screenie 3 */}
@@ -715,6 +794,11 @@ export default function App() {
           </section>
         )}
       </main>
+      )}
+      <footer className="app-foot">
+        Wodnik powstał na HackNation 2026, żeby pomagać rolnikom zatrzymać wodę na polu. Rady opieramy na publicznych
+        danych i jawnych metodach; ważne decyzje warto omówić z doradcą rolniczym (ODR).
+      </footer>
     </div>
   );
 }

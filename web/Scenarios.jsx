@@ -1,6 +1,6 @@
 import React from "react";
 
-// Karta „Co dalej: najbliższe 30 dni” – scenariusze z 31 lat (wodnik/scenarios.py).
+// Karta „Co dalej: najbliższe 30 dni” – scenariusze z 10 lat przed datą analizy (wodnik/scenarios.py).
 // Wykres pokazuje zapas wody dostępnej dla roślin (mm): pasmo = od suchych (10%) do mokrych (90%) scenariuszy,
 // linia = scenariusz typowy (mediana), przerywana = próg, poniżej którego roślina jest w stresie.
 
@@ -74,7 +74,7 @@ export default function Scenarios({ s }) {
       <div style={{ fontSize: 12, color: "#9db0c0" }}>
         Zapas wody dostępnej dla roślin. Pasmo: od suchych do mokrych scenariuszy, linia: scenariusz typowy.
         {s.forecast_days_used > 0 && ` Pierwsze ${s.forecast_days_used} dni z prognozy pogody.`} To nie jest prognoza
-        konkretnej pogody, tylko rozkład możliwych przebiegów na podstawie lat 1995–2025.
+        konkretnej pogody, tylko rozkład możliwych przebiegów na podstawie lat {s.period || "poprzednich"}.
       </div>
     </div>
   );

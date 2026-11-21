@@ -19,6 +19,7 @@ Kryterium „prostota obsługi” (15%) mówi o użytkowniku **bez przygotowania
    wybór       postęp        podsumowanie│→ [5 Dlaczego?] dane, wykres, pewność
    działki                                └→ [6 Raport] AI + druk / PDF
                                   [7 O metodzie] źródła, licencje, ograniczenia (stopka)
+ [8 Logowanie / Załóż konto] ←→ [9 Profil: moje raporty] → [3 Wynik] (raport z historii)
 ```
 
 ## 1. Start: wybór działki
@@ -116,6 +117,26 @@ Pod spodem **stepper 5 kroków** (Ocena · Przyczyny · Retencja · Agrotechnika
 - Ikona 📍 przenosi na mapę do konkretnego miejsca.
 - Nawadnianie ma zawsze wizualnie najniższy priorytet (szare tło, etykieta „dopiero na końcu”), zgodnie z wytycznymi KOWR.
 
+### Wykresy w raporcie (gotowe komponenty: `web/Charts.jsx`)
+
+Proponowane miejsca w sekcji „Raport niedoborów” (kolejność: co się stało → co dalej → co zrobić):
+
+```
+Podsumowanie ryzyka
+[Główne przyczyny] [Bilans wodny + <YearsChart charts={report.charts} />]   ← zamiast zdania „tak sucho było w X% lat”
+<HistoryChart charts={report.charts} scenarios={report.scenarios} />       ← NOWA karta, przełącznik „Woda w glebie / Opad i parowanie”
+<Scenarios s={report.scenarios} />                                         ← jest; zaczyna się tam, gdzie kończy się HistoryChart
+Rekomendacje
+```
+
+- Komponenty nic nie rysują, gdy raport nie ma pola `charts` (starsze wyniki).
+- Wygląd: przyciski przełącznika mają klasy `.chart-tabs button` i `.on` (bez stylów, do dopisania w `styles.css`);
+  kolory i czcionkę wykresów zmienia się zmiennymi CSS `--chart-*` (lista na początku `web/charts.js`),
+  np. dla ciemnego tła `--chart-ink`, `--chart-muted`, `--chart-grid`, `--chart-stress-bg`.
+- Na wąskim ekranie wykres się skaluje; przy bardzo małej szerokości warto zwiększyć `--chart-font`.
+- PDF (`@react-pdf/renderer`) nie wyświetla tych SVG wprost; najprościej odesłać do raportu do druku z serwera
+  (`/api/v1/analyses/{id}/raport`), który ma już wszystkie trzy wykresy.
+
 ## 4. Mapa działań
 
 Pełnoekranowa mapa z warstwami do włączania:
@@ -147,7 +168,7 @@ Dla doradców i jury. Jeden wykres plus tabela.
 ```
 
 Pod wykresem:
-- 4 wskaźniki oceny z percentylem w tle 31 lat („tak sucho było w 16% lat”),
+- 4 wskaźniki oceny z percentylem na tle 10 lat („tak sucho było w 16% lat”),
 - tabela źródeł: nazwa, co daje, **czy dane były z internetu czy z cache**, data pobrania,
 - lista ograniczeń (`uncertainty`) i co poprawi pewność (np. „wpisz typ gleby z badania”).
 
@@ -176,6 +197,35 @@ Generowanie opisu w języku rolnika z gotowego wyniku. Szczegóły i zabezpiecze
 ## 7. O metodzie
 
 Statyczna strona w stopce: kolejność KOWR, metody (FAO-56, SoilGrids, NMT), tabela źródeł z licencjami, ograniczenia. To odpowiada wymogowi transparentności z regulaminu i kryterium wiarygodności.
+
+## 8. Logowanie i zakładanie konta
+
+**Zrobione** (`web/Landing.jsx`, style w `web/landing.css`): strona startowa z opisem projektu, liczbami o problemie,
+pitchem, krokami analizy, źródłami danych, modelem biznesowym i planem wdrożenia; po prawej karta logowania
+i rejestracji oraz „Wypróbuj bez konta”. Po zalogowaniu `App.jsx` pokazuje aplikację, w pasku: imię, „raporty”
+(profil) i „Wyloguj”.
+
+Konto jest **opcjonalne**: nie blokujemy analizy, tylko zachęcamy („Zaloguj się, aby zapisywać raporty”).
+- Pola: e-mail, hasło (min. 8 znaków), przy zakładaniu konta opcjonalnie imię. Przełącznik „Mam konto / Załóż konto”.
+- Błędy z serwera pokazujemy pod formularzem (`EMAIL_TAKEN`, `BAD_CREDENTIALS`, za krótkie hasło).
+- Po sukcesie wracamy tam, skąd użytkownik przyszedł; w nagłówku imię lub e-mail i „Wyloguj”.
+- Funkcje w `web/api.js`: `api.register({email, password, name})`, `api.login({email, password})`, `api.logout()`,
+  `api.me()` (użytkownik albo `null`, np. przy starcie aplikacji), `api.isLoggedIn()`. Token zapisuje się sam.
+
+## 9. Profil: historia raportów
+
+**Zrobione** (`web/Profile.jsx`): lista raportów z poziomem ryzyka, Otwórz / Drukuj / Usuń. Pod raportem jest
+asystent (`web/Chat.jsx`) z podpowiedziami pytań.
+
+- Imię, e-mail, data założenia konta, liczba raportów (`api.me()` → `reports_count`).
+- Lista raportów od najnowszego (`api.listReports()`): miejsce, data analizy, uprawa, poziom ryzyka (kolor jak na
+  ekranie 3), data zapisu.
+- Akcje przy wpisie: **Otwórz** (`api.getReport(id)` zwraca ten sam model widoku co `runAnalysis`, więc ekran 3
+  i PDF działają bez zmian), **Drukuj** (`api.openReportHtml(id)`), **Usuń** (`api.deleteReport(id)`, z potwierdzeniem).
+- Pusty stan: „Brak zapisanych raportów. Zrób analizę, a pojawi się tutaj.”
+- Każda analiza zalogowanego trafia do historii automatycznie (`runAnalysis` wysyła token).
+
+Działający przykład tych ekranów (bez dbania o wygląd): widok `/prosty`.
 
 ## Stany pomocnicze
 

@@ -86,3 +86,32 @@ def at_point(lat: float, lon: float) -> Soil:
     fc, wp = saxton_rawls(sand / 100, clay / 100, soc_pct * 1.724)
     label, cat = _classify(sand, clay)
     return Soil(round(sand, 1), round(clay, 1), round(soc_pct, 2), round(fc, 3), round(wp, 3), label, cat)
+
+
+def near(lat: float, lon: float, step_m: float = 250.0) -> Soil:
+    """Gleba w punkcie, a gdy SoilGrids nie ma tam danych (piksel 250 m uznany za zabudowę lub wodę),
+    w najbliższych sąsiednich pikselach (4 kierunki). Sąsiadów pytamy równolegle."""
+    try:
+        return at_point(lat, lon)
+    except DataSourceError as first:
+        if "nie ma danych" not in str(first):
+            raise
+    import math
+    from concurrent.futures import ThreadPoolExecutor
+
+    dlat = step_m / 111_320
+    dlon = step_m / (111_320 * math.cos(math.radians(lat)))
+    pts = [(lat + dlat, lon), (lat - dlat, lon), (lat, lon + dlon), (lat, lon - dlon)]
+
+    def try_pt(pt):
+        try:
+            return at_point(*pt)
+        except DataSourceError:
+            return None
+
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        for s in ex.map(try_pt, pts):
+            if s is not None:
+                return s
+    raise DataSourceError("SoilGrids nie ma danych dla tej działki ani najbliższego otoczenia "
+                          "(np. teren zabudowany lub woda).")

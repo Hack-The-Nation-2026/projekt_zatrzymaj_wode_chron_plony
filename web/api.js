@@ -3,9 +3,22 @@
 // W trybie `npm run dev` zapytania /api przekazuje do serwera proxy z vite.config.js.
 
 const API = "/api/v1";
+const TOKEN_KEY = "wodnik_token";
 
-async function call(path, opts) {
-  const r = await fetch(API + path, opts);
+// Token sesji (logowanie). Brak dostępu do localStorage (tryb prywatny) nie psuje aplikacji.
+let token = null;
+try { token = localStorage.getItem(TOKEN_KEY); } catch { /* bez zapamiętania */ }
+function setToken(t) {
+  token = t;
+  try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch { /* j.w. */ }
+}
+
+async function call(path, opts = {}) {
+  const headers = { ...(opts.headers || {}) };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const r = await fetch(API + path, { ...opts, headers });
+  if (r.status === 401 && token && !path.startsWith("/auth/")) setToken(null); // sesja wygasła
+  if (r.status === 204) return null;
   const body = await r.json().catch(() => ({}));
   if (!r.ok) {
     const e = body.error || {};
@@ -53,10 +66,12 @@ export function toView(report, parcel, crop, id) {
       depletion_mm: num(raw.wyczerpanie_mm, 1, "mm"),
       taw_mm: num(raw.TAW_mm, 1, "mm"),
       percentile: raw.wilgotnosc_percentyl != null
-        ? `tak sucho było w ${num(raw.wilgotnosc_percentyl, 0)}% lat (z ${raw.lata_referencyjne} lat)`
+        ? `wilgotność gleby: w ${num(raw.wilgotnosc_percentyl, 0)}% z ostatnich ${raw.lata_referencyjne} lat było tak samo sucho lub suszej`
         : "brak danych o wilgotności gleby dla tej daty",
     },
     scenarios: report.scenarios || null,
+    charts: report.charts || null, // dane do wykresów (Charts.jsx), brak w starszych raportach
+    whatIf: report.what_if || null, // „co da retencja” (WhatIf.jsx), brak w starszych raportach
     full: report, // pełny wynik: ocena, uzasadnienia, niepewność, źródła
   };
 }
@@ -66,13 +81,65 @@ function parcelView(p) {
            area_ha: p.area_ha, center: p.center, geometry: p.geometry };
 }
 
+const jsonPost = (path, data) =>
+  call(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+
 export const api = {
+  // --- konto ---
+  isLoggedIn: () => Boolean(token),
+  /** Zakłada konto i od razu loguje. Zwraca { id, email, name, created_at }. */
+  register: async ({ email, password, name }) => {
+    const r = await jsonPost("/auth/register", { email, password, name: name || null });
+    setToken(r.token);
+    return r.user;
+  },
+  login: async ({ email, password }) => {
+    const r = await jsonPost("/auth/login", { email, password });
+    setToken(r.token);
+    return r.user;
+  },
+  logout: async () => {
+    try { await call("/auth/logout", { method: "POST" }); } finally { setToken(null); }
+  },
+  /** Zalogowany użytkownik albo null. */
+  me: async () => (token ? call("/me").catch(() => null) : null),
+
+  // --- historia raportów (profil) ---
+  /** Lista: [{ id, parcel_id, place, date, crop, risk_level, saved_at }], najnowsze pierwsze. */
+  listReports: () => call("/me/reports"),
+  /** Pełny raport z historii w tym samym formacie co wynik runAnalysis. */
+  getReport: async (id) => {
+    const r = await call(`/me/reports/${id}`);
+    const p = r.report.parcel || {};
+    const parcel = { id: p.id, commune: p.gmina, region: p.obreb, area_ha: p.powierzchnia_ha,
+                     center: p.srodek, geometry: p.geometria_wgs84 };
+    return { ...toView(r.report, parcel, { name: r.report.crop }, r.analysis_id), historyId: r.id };
+  },
+  deleteReport: (id) => call(`/me/reports/${id}`, { method: "DELETE" }),
+  /** Otwiera raport z historii do druku w nowej karcie (wymaga zalogowania). */
+  openReportHtml: async (id) => {
+    const r = await fetch(`${API}/me/reports/${id}/raport`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) throw new Error("Nie udało się otworzyć raportu.");
+    window.open(URL.createObjectURL(await r.blob()), "_blank");
+  },
+
   searchParcelById: async (id) => parcelView(await call(`/parcels/by-id?id=${encodeURIComponent(id)}`)),
 
   resolveParcelByCoords: async (lat, lon) =>
     parcelView(await call(`/parcels/resolve?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`)),
 
-  /** Uruchamia analizę i czeka na wynik; onProgress(lista etapów) przy każdym odpytaniu. */
+  // --- asystent ---
+  /** Czat o raporcie. messages: [{ role: "user" | "assistant", content }], report: model widoku z runAnalysis
+   *  lub getReport (albo null). Zwraca { reply, source: "ai" | "fallback" }. */
+  chat: ({ messages, report }) =>
+    jsonPost("/chat", {
+      messages,
+      ...(report?.historyId ? { report_id: report.historyId } : report?.id ? { analysis_id: report.id } : {}),
+    }),
+
+  // --- analiza ---
+  /** Uruchamia analizę i czeka na wynik; onProgress(lista etapów) przy każdym odpytaniu.
+   *  Gdy użytkownik jest zalogowany, wynik trafia też do jego historii. */
   runAnalysis: async ({ parcel, crop, date, onProgress }) => {
     const job = await call("/analyses", {
       method: "POST",

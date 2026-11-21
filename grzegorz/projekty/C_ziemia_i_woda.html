@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Wodnik – wariant C: ziemia i woda</title>
+</head>
+<body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&amp;family=Inter:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#1d1814}
+a{color:#5db3f0}a:hover{color:#8ccbf6}
+.c-band{background-image:linear-gradient(90deg,rgba(29,24,20,0) 30%,rgba(29,24,20,0.85) 62%,rgba(29,24,20,0.96) 100%),url(../../web/public/img/rolnik-pole.jpg);background-size:cover;background-position:left center}
+</style>
+<div style="font-family: Inter, system-ui, sans-serif; color: #f3ece2; background: #1d1814; min-height: 100vh">
+
+<header style="max-width: 1240px; margin: 0 auto; padding: 22px 24px; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap">
+<div style="display: flex; align-items: center; gap: 10px; font-family: 'Space Grotesk', Inter, sans-serif; font-weight: 700; font-size: 24px">
+<svg width="22" height="28" viewBox="0 0 22 28" aria-hidden="true"><path d="M11 1C11 1 1 14 1 19a10 10 0 0020 0C21 14 11 1 11 1z" fill="#5db3f0"></path></svg>
+wodnik
+</div>
+<a href="#logowanie-c" style="border: 1px solid #5b4d40; color: #f3ece2; padding: 11px 20px; border-radius: 999px; font-weight: 600; text-decoration: none">Zaloguj się</a>
+</header>
+
+<section style="max-width: 1100px; margin: 0 auto; padding: 40px 24px 24px; display: flex; flex-direction: column; align-items: center; gap: 28px; text-align: center">
+<p style="margin: 0; color: #e8b13a; font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase">Zatrzymaj wodę · chroń plony</p>
+<h1 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 84px; line-height: 0.98; letter-spacing: -0.035em; font-weight: 700">Woda, która zostaje,<br>to plon, który rośnie.</h1>
+<div style="width: 300px; height: 300px; border-radius: 50%; overflow: hidden; background: #0d1b2a; border: 6px solid #2a231d; display: flex; align-items: center; justify-content: center">
+<img src="../../web/public/img/klos-ladowanie.gif" alt="Animacja: kropla wody spada na ziarno, z którego wyrasta kłos" style="width: 380px; height: 252px; display: block">
+</div>
+<p style="margin: 0; font-size: 20px; line-height: 1.6; color: #d9cdbd; max-width: 700px">Podaj numer działki i datę. W minutę dowiesz się, czy roślinom brakuje wody, skąd ten niedobór i gdzie na polu zatrzymać deszcz, zanim spłynie.</p>
+</section>
+
+<section id="logowanie-c" style="max-width: 1000px; margin: 0 auto; padding: 16px 24px 64px">
+<form style="background: #2a231d; border: 1px solid #3d332a; border-radius: 22px; padding: 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end">
+<div style="flex: 1 1 240px; display: flex; flex-direction: column; gap: 6px">
+<label for="c-email" style="font-size: 13px; font-weight: 600; color: #d9cdbd">E-mail</label>
+<input id="c-email" type="email" placeholder="jan@gospodarstwo.pl" style="height: 48px; border: 1px solid #5b4d40; background: #1d1814; color: #f3ece2; border-radius: 12px; padding: 0 14px; font-size: 15px">
+</div>
+<div style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 6px">
+<label for="c-haslo" style="font-size: 13px; font-weight: 600; color: #d9cdbd">Hasło</label>
+<input id="c-haslo" type="password" style="height: 48px; border: 1px solid #5b4d40; background: #1d1814; color: #f3ece2; border-radius: 12px; padding: 0 14px; font-size: 15px">
+</div>
+<button type="button" style="flex: 0 0 auto; height: 48px; padding: 0 26px; border: 0; border-radius: 12px; background: #e8b13a; color: #1d1814; font-size: 15px; font-weight: 700">Zaloguj się</button>
+<button type="button" style="flex: 0 0 auto; height: 48px; padding: 0 22px; border: 1px solid #5b4d40; border-radius: 12px; background: transparent; color: #f3ece2; font-size: 15px; font-weight: 600">Załóż konto</button>
+</form>
+<p style="margin: 12px 0 0; text-align: center; font-size: 14px; color: #cbbfae">Konto jest darmowe i zapisuje historię raportów. <a href="#kroki-c">Możesz też zacząć bez konta.</a></p>
+</section>
+
+<section class="c-band" style="min-height: 520px; display: flex; align-items: center">
+<div style="max-width: 1240px; width: 100%; margin: 0 auto; padding: 56px 24px; display: flex; flex-wrap: wrap">
+<div style="flex: 1 1 480px"></div>
+<blockquote style="flex: 1 1 480px; margin: 0; display: flex; flex-direction: column; gap: 16px">
+<p style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 42px; line-height: 1.12; letter-spacing: -0.02em">„Rolnik zna swoje pole. My dokładamy dane.”</p>
+<p style="margin: 0; font-size: 17px; line-height: 1.65; color: #e6dccd">Szanujemy wiedzę gospodarzy. Satelity, modele terenu i dziesięć lat pogody to osobna specjalizacja, więc bierzemy ją na siebie i oddajemy kilka prostych rad dla jednego pola.</p>
+</blockquote>
+</div>
+</section>
+
+<section style="max-width: 1240px; margin: 0 auto; padding: 72px 24px 24px">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 32px">
+<div style="display: flex; flex-direction: column; gap: 6px"><b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 56px; letter-spacing: -0.03em; color: #5db3f0">1026 m³</b><span style="color: #d9cdbd">spłynie z działki w Łazisku i sąsiednich pól przy ulewie 50 mm</span></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 56px; letter-spacing: -0.03em; color: #e8b13a">433 m</b><span style="color: #d9cdbd">niskiego wału zatrzyma tę wodę na polu</span></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 56px; letter-spacing: -0.03em; color: #9ccf86">781 m³</b><span style="color: #d9cdbd">zmieszczą naturalne obniżenia na oczko wodne</span></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><b style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 56px; letter-spacing: -0.03em; color: #f3ece2">7 z 10</b><span style="color: #d9cdbd">ostatnich lat miało tam w połowie czerwca bilans wody poniżej −100 mm</span></div>
+</div>
+</section>
+
+<section id="kroki-c" style="max-width: 1240px; margin: 0 auto; padding: 56px 24px">
+<h2 style="margin: 0 0 28px; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 44px; letter-spacing: -0.02em">Pięć kroków, zawsze w tej kolejności</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 2px; background: #3d332a; border-radius: 20px; overflow: hidden">
+<div style="background: #2a231d; padding: 24px"><span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 40px; color: #5b4d40">01</span><h3 style="margin: 8px 0 6px; font-size: 19px">Ocena</h3><p style="margin: 0; color: #cbbfae; font-size: 15px">Czy roślinom brakuje wody dziś?</p></div>
+<div style="background: #2a231d; padding: 24px"><span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 40px; color: #5b4d40">02</span><h3 style="margin: 8px 0 6px; font-size: 19px">Przyczyny</h3><p style="margin: 0; color: #cbbfae; font-size: 15px">Deszcz, gleba czy spływ?</p></div>
+<div style="background: #2a231d; padding: 24px"><span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 40px; color: #5b4d40">03</span><h3 style="margin: 8px 0 6px; font-size: 19px">Retencja</h3><p style="margin: 0; color: #cbbfae; font-size: 15px">Wał, pas zieleni, oczko.</p></div>
+<div style="background: #2a231d; padding: 24px"><span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 40px; color: #5b4d40">04</span><h3 style="margin: 8px 0 6px; font-size: 19px">Agrotechnika</h3><p style="margin: 0; color: #cbbfae; font-size: 15px">Międzyplony i resztki pożniwne.</p></div>
+<div style="background: #2a231d; padding: 24px"><span style="font-family: 'Space Grotesk', Inter, sans-serif; font-size: 40px; color: #5b4d40">05</span><h3 style="margin: 8px 0 6px; font-size: 19px">Nawadnianie</h3><p style="margin: 0; color: #cbbfae; font-size: 15px">Na końcu, gdy ma sens.</p></div>
+</div>
+</section>
+
+<section style="max-width: 900px; margin: 0 auto; padding: 48px 24px 88px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 18px">
+<h2 style="margin: 0; font-family: 'Space Grotesk', Inter, sans-serif; font-size: 44px; letter-spacing: -0.02em">Darmowe dla rolnika. Opłacalne dla państwa.</h2>
+<p style="margin: 0; font-size: 17px; line-height: 1.6; color: #d9cdbd">Wodnik liczy na danych publicznych, więc rolnik nie płaci nic. Dla KOWR i doradców ODR to mniej strat po suszy i dotacje na retencję tam, gdzie naprawdę działa.</p>
+<a href="#logowanie-c" style="background: #e8b13a; color: #1d1814; padding: 16px 30px; border-radius: 999px; font-weight: 700; text-decoration: none">Sprawdź swoje pole</a>
+</section>
+
+<footer style="border-top: 1px solid #3d332a; padding: 28px 24px; text-align: center; color: #cbbfae; font-size: 14px">Wodnik · HackNation 2026 · dane: GUGiK, Copernicus, ISRIC SoilGrids</footer>
+</div>
+</body>
+</html>

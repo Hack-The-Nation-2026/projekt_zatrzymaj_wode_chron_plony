@@ -3,12 +3,12 @@
 Metoda (prognoza zespołowa z danych historycznych, ang. ensemble streamflow prediction):
 1. Startujemy z dzisiejszego stanu strefy korzeniowej z bilansu FAO-56 (wyczerpanie Dr).
 2. Kolejne dni symulujemy tym samym bilansem, z opadem i ET₀ z tych samych dni kalendarzowych
-   w każdym z lat referencyjnych (1995–2025). Każdy rok to jeden równie prawdopodobny scenariusz.
+   w każdym z 10 lat poprzedzających analizę. Każdy rok to jeden równie prawdopodobny scenariusz.
 3. Gdy dla daty jest prognoza pogody, pierwsze dni bierzemy z prognozy (wspólne dla wszystkich scenariuszy).
 Wynik: prawdopodobieństwo stresu wodnego w 14 i 30 dni, typowy dzień jego początku,
 ilość wody potrzebna, by stresu uniknąć, oraz pasmo przebiegu zapasu wody (do wykresu).
 
-Ograniczenia: zakłada, że przyszła pogoda przypomina tę z ostatnich 31 lat (ocieplenie klimatu
+Ograniczenia: zakłada, że przyszła pogoda przypomina tę z ostatnich 10 lat (ocieplenie klimatu
 może sprawiać, że wynik jest nieco zbyt optymistyczny); nie korzysta z prognoz sezonowych.
 """
 

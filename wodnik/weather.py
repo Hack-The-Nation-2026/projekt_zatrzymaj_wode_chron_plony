@@ -16,7 +16,12 @@ from .http import get_json
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 ARCHIVE_LAG_DAYS = 6
-CLIMATE_YEARS = (1995, 2025)
+# Tło wieloletnie: 10 pełnych lat poprzedzających rok analizy (wymóg zadania KOWR: „dane za ostatnie 10 lat”).
+CLIMATE_YEARS_BACK = 10
+
+
+def climate_years(target: date) -> list[int]:
+    return list(range(target.year - CLIMATE_YEARS_BACK, target.year))
 
 DAILY = "precipitation_sum,et0_fao_evapotranspiration,temperature_2m_max"
 
@@ -106,18 +111,17 @@ def _year_window(lat: float, lon: float, d: date):
 
 
 def climatology(lat: float, lon: float, target: date) -> Climate:
-    """Tło wieloletnie: zamiast 31 pełnych lat pobieramy tylko potrzebne okna (wielokrotnie
-    mniejsze zużycie limitu darmowego API, a każde okno trafia osobno do cache)."""
+    """Tło wieloletnie z 10 lat przed rokiem analizy: z każdego roku pobieramy tylko potrzebne okno
+    (mniejsze zużycie limitu darmowego API, a każde okno trafia osobno do cache)."""
     from concurrent.futures import ThreadPoolExecutor
 
-    y0, y1 = CLIMATE_YEARS
     days = []
-    for y in range(y0, y1 + 1):
+    for y in climate_years(target):
         try:
             days.append(target.replace(year=y))
         except ValueError:  # 29 lutego
             days.append(target.replace(year=y, day=28))
-    with ThreadPoolExecutor(max_workers=6) as ex:
+    with ThreadPoolExecutor(max_workers=10) as ex:
         rows = list(ex.map(lambda d: _year_window(lat, lon, d), days))
     k30, k60, smv, fp, fe = zip(*rows)
     return Climate([d.year for d in days], np.array(k30), np.array(k60), np.array(smv), list(fp), list(fe))

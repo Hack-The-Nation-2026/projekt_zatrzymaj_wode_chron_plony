@@ -18,6 +18,30 @@
       </div>
     </header>
 
+    <section id="account" class="card account" aria-label="Konto">
+      <div id="loggedOut">
+        <form id="authForm" autocomplete="on">
+          <div class="row two">
+            <div><label for="authEmail">E-mail</label><input id="authEmail" type="email" autocomplete="email" required></div>
+            <div><label for="authPass">Hasło</label><input id="authPass" type="password" autocomplete="current-password" minlength="8" required></div>
+          </div>
+          <div id="nameRow" hidden><label for="authName">Imię (opcjonalnie)</label><input id="authName" autocomplete="given-name"></div>
+          <div class="row">
+            <button type="submit" id="authBtn" class="secondary">Zaloguj się</button>
+            <button type="button" id="authToggle" class="link">Nie masz konta? Załóż je</button>
+          </div>
+          <p id="authError" class="error" role="alert" hidden></p>
+        </form>
+      </div>
+      <div id="loggedIn" hidden>
+        <p class="row"><span>Zalogowano: <b id="userName"></b></span><button type="button" id="logoutBtn" class="link">Wyloguj</button></p>
+        <details id="historyBox">
+          <summary>Moje raporty (<span id="historyCount">0</span>)</summary>
+          <ul id="history" class="history"></ul>
+        </details>
+      </div>
+    </section>
+
     <form id="form" class="card form" autocomplete="off">
       <label for="parcelId">Działka</label>
       <div class="row">
@@ -60,6 +84,7 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module">import * as charts from "./charts.js"; window.WodnikCharts = charts;</script>
 <script src="app.js"></script>
 </body>
 </html>

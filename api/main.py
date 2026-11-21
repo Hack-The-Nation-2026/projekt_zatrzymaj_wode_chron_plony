@@ -20,23 +20,26 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from wodnik import __version__, analysis, crops, output, parcel
 from wodnik.http import OFFLINE, DataSourceError
 
+from . import accounts, chat
+
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+
 PARCEL_ID_RE = re.compile(r"^\d{6}_\d\.\d{4}(\.[\w/-]+){1,2}$")
 POLAND_BBOX = (14.0, 49.0, 24.2, 55.0)  # lon_min, lat_min, lon_max, lat_max
 
 app = FastAPI(title="Wodnik API", version=__version__,
               description="Analiza sytuacji wodnej działki rolnej (HackNation 2026, zadanie KOWR).")
 app.add_middleware(CORSMiddleware, allow_origins=[os.environ.get("WODNIK_CORS_ORIGIN", "*")],
-                   allow_methods=["GET", "POST"], allow_headers=["*"])
+                   allow_methods=["GET", "POST", "DELETE"], allow_headers=["*"])
 
 _executor = ThreadPoolExecutor(max_workers=2)
 _jobs: dict[str, dict] = {}
@@ -131,11 +134,164 @@ class AnalysisRequest(BaseModel):
         return self
 
 
+# --- konta użytkowników ---------------------------------------------------------------
+
+accounts.init()
+
+
+class RegisterRequest(BaseModel):
+    email: str = Field(..., max_length=254, examples=["jan@example.com"])
+    password: str = Field(..., max_length=200)
+    name: Optional[str] = Field(None, max_length=80)
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(..., max_length=254)
+    password: str = Field(..., max_length=200)
+
+
+def _bearer(authorization: Optional[str]) -> Optional[str]:
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization[7:].strip() or None
+    return None
+
+
+def current_user_optional(authorization: Optional[str] = Header(None)) -> Optional[dict]:
+    return accounts.user_for_token(_bearer(authorization))
+
+
+def current_user(user: Optional[dict] = Depends(current_user_optional)) -> dict:
+    if not user:
+        _err(401, "UNAUTHORIZED", "Zaloguj się, aby zobaczyć tę stronę.")
+    return user
+
+
+def _account_error(exc: accounts.AccountError):
+    status = {"EMAIL_TAKEN": 409, "BAD_CREDENTIALS": 401}.get(exc.code, 400)
+    _err(status, exc.code, str(exc))
+
+
+@app.post("/api/v1/auth/register", status_code=201)
+def register(req: RegisterRequest, request: Request):
+    if _rate_limited("auth:" + (request.client.host if request.client else "?")):
+        _err(429, "RATE_LIMITED", "Za dużo prób w krótkim czasie.", "Spróbuj ponownie za minutę.")
+    try:
+        accounts.register(req.email, req.password, req.name)
+        token, user = accounts.login(req.email, req.password)
+    except accounts.AccountError as exc:
+        _account_error(exc)
+    return {"token": token, "user": user}
+
+
+@app.post("/api/v1/auth/login")
+def login(req: LoginRequest, request: Request):
+    if _rate_limited("auth:" + (request.client.host if request.client else "?")):
+        _err(429, "RATE_LIMITED", "Za dużo prób logowania.", "Spróbuj ponownie za minutę.")
+    try:
+        token, user = accounts.login(req.email, req.password)
+    except accounts.AccountError as exc:
+        _account_error(exc)
+    return {"token": token, "user": user}
+
+
+@app.post("/api/v1/auth/logout", status_code=204)
+def logout(authorization: Optional[str] = Header(None)):
+    token = _bearer(authorization)
+    if token:
+        accounts.logout(token)
+
+
+@app.get("/api/v1/me")
+def me(user: dict = Depends(current_user)):
+    return {**user, "reports_count": len(accounts.list_reports(user["id"], limit=10_000))}
+
+
+@app.get("/api/v1/me/reports")
+def my_reports(user: dict = Depends(current_user)):
+    return accounts.list_reports(user["id"])
+
+
+def _my_report(user: dict, report_id: int) -> dict:
+    r = accounts.get_report(user["id"], report_id)
+    if not r:
+        _err(404, "NOT_FOUND", "Nie ma takiego raportu w Twojej historii.")
+    return r
+
+
+@app.get("/api/v1/me/reports/{report_id}")
+def my_report(report_id: int, user: dict = Depends(current_user)):
+    return _my_report(user, report_id)
+
+
+@app.get("/api/v1/me/reports/{report_id}/raport", response_class=HTMLResponse)
+def my_report_html(report_id: int, user: dict = Depends(current_user)):
+    return HTMLResponse(output.html_report(_my_report(user, report_id)["report"]))
+
+
+@app.delete("/api/v1/me/reports/{report_id}", status_code=204)
+def delete_my_report(report_id: int, user: dict = Depends(current_user)):
+    if not accounts.delete_report(user["id"], report_id):
+        _err(404, "NOT_FOUND", "Nie ma takiego raportu w Twojej historii.")
+
+
+@app.post("/api/v1/me/reports", status_code=201)
+def save_to_history(body: dict, user: dict = Depends(current_user)):
+    """Ręczne dopisanie gotowej analizy (np. działki demo) do historii: {"analysis_id": "..."}."""
+    job = _jobs.get(str(body.get("analysis_id", "")))
+    if not job or job["status"] != "done":
+        _err(404, "NOT_FOUND", "Analiza nie istnieje lub jeszcze trwa.")
+    return {"id": accounts.save_report(user["id"], job["id"], job["report"])}
+
+
+def _save_for_owners(job: dict) -> None:
+    for uid in list(job.get("owners", ())):
+        try:
+            accounts.save_report(uid, job["id"], job["report"])
+        except Exception:  # historia nie może zepsuć samej analizy
+            pass
+
+
+# --- asystent (czat) ----------------------------------------------------------------
+
+class ChatMessage(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str = Field(..., max_length=4000)
+
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage] = Field(..., min_length=1, max_length=40)
+    analysis_id: Optional[str] = Field(None, max_length=80)  # wynik z bieżącej sesji serwera
+    report_id: Optional[int] = None  # albo raport z historii zalogowanego użytkownika
+
+
+@app.post("/api/v1/chat")
+def chat_reply(req: ChatRequest, request: Request, user: Optional[dict] = Depends(current_user_optional)):
+    """Asystent z radami; gdy podano analizę lub raport z historii, odpowiada na jego podstawie."""
+    if _rate_limited("chat:" + (request.client.host if request.client else "?")):
+        _err(429, "RATE_LIMITED", "Za dużo pytań w krótkim czasie.", "Spróbuj ponownie za minutę.")
+    report = None
+    if req.report_id is not None:
+        if not user:
+            _err(401, "UNAUTHORIZED", "Zaloguj się, aby rozmawiać o raporcie z historii.")
+        report = _my_report(user, req.report_id)["report"]
+    elif req.analysis_id:
+        job = _jobs.get(req.analysis_id)
+        if not job or job["status"] != "done":
+            _err(404, "NOT_FOUND", "Analiza nie istnieje lub jeszcze trwa.")
+        report = job["report"]
+    try:
+        text, source = chat.reply([m.model_dump() for m in req.messages], report)
+    except ValueError as exc:
+        _err(400, "INVALID_INPUT", str(exc))
+    return {"reply": text, "source": source, "model": chat.MODEL if source == "ai" else None}
+
+
 # --- endpointy ----------------------------------------------------------------------
 
 @app.get("/api/v1/health")
 def health():
-    return {"status": "ok", "version": __version__, "offline_mode": OFFLINE, "jobs": len(_jobs)}
+    return {"status": "ok", "version": __version__, "offline_mode": OFFLINE, "jobs": len(_jobs),
+            "chat_ai": bool(os.environ.get("OPENAI_API_KEY"))}
 
 
 @app.get("/api/v1/crops")
@@ -176,12 +332,11 @@ def parcel_by_id(id: str):
 def _run(job_id: str, req: AnalysisRequest) -> None:
     job = _jobs[job_id]
 
-    def progress(step: str) -> None:
+    def progress(step: str, state: str = "running") -> None:
+        # Etapy pobierania danych biegną równolegle, więc każdy etap ma własny stan.
         for s in job["progress"]:
-            if s["state"] == "running":
-                s["state"] = "done"
             if s["step"] == step:
-                s["state"] = "running"
+                s["state"] = state
 
     t0 = time.time()
     try:
@@ -189,11 +344,13 @@ def _run(job_id: str, req: AnalysisRequest) -> None:
                                point=(req.point.lat, req.point.lon) if req.point else None,
                                on=req.date, crop_key=req.crop, progress=progress)
         for s in job["progress"]:
-            s["state"] = "done"
+            if s["state"] != "failed":  # źródło pominięte (brak czasu lub błąd) zostaje oznaczone
+                s["state"] = "done"
         job["report_obj"] = rep
         job["report"] = _clean(rep.to_dict())
         job["meta"] = {"computed_ms": int((time.time() - t0) * 1000)}
         job["status"] = "done"
+        _save_for_owners(job)
     except Exception as exc:  # błąd trafia do klienta w ustalonym formacie
         job["status"] = "failed"
         job["error"] = _error_from(exc)
@@ -202,18 +359,56 @@ def _run(job_id: str, req: AnalysisRequest) -> None:
                 s["state"] = "failed"
 
 
+RATE_LIMIT_PER_MIN = int(os.environ.get("WODNIK_RATE_LIMIT", "20"))
+MAX_JOBS = 300
+_hits: dict[str, list] = {}
+
+
+def _rate_limited(ip: str) -> bool:
+    """Prosty limit nowych analiz na adres IP (chroni też limity zewnętrznych źródeł danych)."""
+    now = time.time()
+    hits = [t for t in _hits.get(ip, []) if now - t < 60]
+    _hits[ip] = hits
+    if len(hits) >= RATE_LIMIT_PER_MIN:
+        return True
+    hits.append(now)
+    return False
+
+
+def _prune_jobs() -> None:
+    """Pamięć serwera: zostawiamy najnowsze zadania (działki demo zostają zawsze)."""
+    finished = sorted((j for j in _jobs.values() if not j.get("demo") and j["status"] != "running"),
+                      key=lambda j: j["created"])
+    for j in finished[: max(0, len(_jobs) - MAX_JOBS)]:
+        _jobs.pop(j["id"], None)
+        for k, v in list(_by_key.items()):
+            if v == j["id"]:
+                _by_key.pop(k, None)
+
+
 @app.post("/api/v1/analyses", status_code=202)
-def start_analysis(req: AnalysisRequest):
+def start_analysis(req: AnalysisRequest, request: Request,
+                   user: Optional[dict] = Depends(current_user_optional)):
+    """Zalogowany użytkownik (nagłówek Authorization: Bearer) dostaje wynik także w swojej historii."""
     on = req.date or date.today()
     key = hashlib.sha1(f"{req.parcel_id}|{req.point}|{on}|{req.crop}".encode()).hexdigest()
     with _lock:
         existing = _by_key.get(key)
         if existing and _jobs[existing]["status"] in ("running", "done"):
+            job = _jobs[existing]
+            if user:
+                job.setdefault("owners", set()).add(user["id"])
+                if job["status"] == "done":
+                    accounts.save_report(user["id"], job["id"], job["report"])
             return {"id": existing, "status": _jobs[existing]["status"],
                     "poll_url": f"/api/v1/analyses/{existing}"}
+        if _rate_limited(request.client.host if request.client else "?"):
+            _err(429, "RATE_LIMITED", "Za dużo analiz w krótkim czasie.", "Spróbuj ponownie za minutę.")
+        _prune_jobs()
         job_id = uuid.uuid4().hex[:10]
         _jobs[job_id] = {"id": job_id, "status": "running", "created": time.time(),
-                         "progress": [{"step": k, "label": lbl, "state": "pending"} for k, lbl in analysis.STEPS]}
+                         "progress": [{"step": k, "label": lbl, "state": "pending"} for k, lbl in analysis.STEPS],
+                         "owners": {user["id"]} if user else set()}
         _by_key[key] = job_id
     _executor.submit(_run, job_id, req)
     return {"id": job_id, "status": "running", "poll_url": f"/api/v1/analyses/{job_id}"}
@@ -224,7 +419,7 @@ def get_analysis(job_id: str):
     job = _jobs.get(job_id)
     if not job:
         _err(404, "NOT_FOUND", "Nie ma takiej analizy.")
-    return {k: v for k, v in job.items() if k not in ("report_obj", "created", "geojson")}
+    return {k: v for k, v in job.items() if k not in ("report_obj", "created", "geojson", "owners")}
 
 
 @app.get("/api/v1/analyses/{job_id}/geojson")
@@ -233,6 +428,15 @@ def get_geojson(job_id: str):
     if not job or job["status"] != "done":
         _err(404, "NOT_FOUND", "Analiza nie istnieje lub jeszcze trwa.")
     return job.get("geojson") or _clean(output.geojson(job["report_obj"]))
+
+
+@app.get("/api/v1/analyses/{job_id}/raport", response_class=HTMLResponse)
+def get_report_html(job_id: str):
+    """Raport do wydruku lub zapisu jako PDF (Ctrl+P → „Zapisz jako PDF”). Działa niezależnie od frontendu."""
+    job = _jobs.get(job_id)
+    if not job or job["status"] != "done":
+        _err(404, "NOT_FOUND", "Analiza nie istnieje lub jeszcze trwa.")
+    return HTMLResponse(output.html_report(job["report"]))
 
 
 # --- działki demo: gotowe wyniki z katalogu demo/, działają bez sieci i bez limitów API ---------

@@ -1,5 +1,7 @@
 """Analiza terenu z Numerycznego Modelu Terenu (GUGiK, LIDAR, siatka 1 m, usługa WCS).
 
+Pobieranie: usługa WCS „DigitalTerrainModel” (EVRF2007, Arc/Info ASCII Grid) zwraca wycinek od razu
+w siatce 2,5 m (kilka sekund); gdy nie odpowiada, zapasowo usługa GeoTIFF w siatce 1 m (bywa bardzo wolna).
 Kroki: wycinek NMT z buforem → uśrednienie do 5 m → wypełnienie zagłębień
 (priority-flood) → kierunki spływu D8 → akumulacja spływu.
 Wynik: spadki, miejsca, którędy woda opuszcza działkę, naturalne zagłębienia
@@ -22,6 +24,9 @@ from .parcel import Parcel, to_latlon
 
 WCS_URL = "https://mapy.geoportal.gov.pl/wss/service/PZGIK/NMT/GRID1/WCS/DigitalTerrainModelFormatTIFF"
 COVERAGE = "DTM_PL-KRON86-NH_TIFF"
+ASCII_URL = "https://mapy.geoportal.gov.pl/wss/service/PZGIK/NMT/GRID1/WCS/DigitalTerrainModel"
+ASCII_COVERAGE = "DTM_PL-EVRF2007-NH"
+FETCH_M = 2.5  # siatka pobierania z usługi ASCII (potem uśrednienie 2 × 2 do CELL_M)
 BUFFER_M = 150
 CELL_M = 5
 MAX_SIDE_M = 2500
@@ -51,21 +56,57 @@ class Terrain:
     depressions: list = field(default_factory=list)
     inflow_area_ha: float = 0.0  # zlewnia spoza działki, która spływa na działkę
     concentrated_flow_share_pct: float = 0.0  # udział działki na liniach skoncentrowanego spływu
+    partial: bool = False  # duża działka: analizowano tylko środkowy fragment MAX_SIDE_M × MAX_SIDE_M
 
 
-def _download_dem(parcel: Parcel):
+def _window(parcel: Parcel):
+    """Obszar pobierania NMT: działka + bufor; dla bardzo dużych działek środkowe okno MAX_SIDE_M."""
     minx, miny, maxx, maxy = parcel.geom_2180.bounds
     minx, miny, maxx, maxy = minx - BUFFER_M, miny - BUFFER_M, maxx + BUFFER_M, maxy + BUFFER_M
+    partial = False
     if maxx - minx > MAX_SIDE_M or maxy - miny > MAX_SIDE_M:
-        raise DataSourceError("Działka jest za duża dla prototypu (bok > 2,2 km).")
-    minx, miny = np.floor(minx), np.floor(miny)
+        c = parcel.geom_2180.centroid
+        if not parcel.geom_2180.contains(c):
+            c = parcel.geom_2180.representative_point()
+        half = MAX_SIDE_M / 2
+        minx, maxx = max(minx, c.x - half), min(maxx, c.x + half)
+        miny, maxy = max(miny, c.y - half), min(maxy, c.y + half)
+        partial = True
+    return (float(np.floor(minx)), float(np.floor(miny)), float(np.ceil(maxx)), float(np.ceil(maxy))), partial
+
+
+def _download_dem_ascii(bounds):
+    """Wycinek NMT w siatce FETCH_M z usługi ASCII Grid (EVRF2007). Zwraca (dem, transform)."""
+    minx, miny, maxx, maxy = bounds
+    w, h = int(round((maxx - minx) / FETCH_M)), int(round((maxy - miny) / FETCH_M))
+    maxx, maxy = minx + w * FETCH_M, miny + h * FETCH_M
+    data = get_bytes(
+        ASCII_URL + f"?SERVICE=WCS&VERSION=1.0.0&REQUEST=GetCoverage&FORMAT=image/x-aaigrid"
+        f"&COVERAGE={ASCII_COVERAGE}&BBOX={minx:.0f},{miny:.0f},{maxx:.0f},{maxy:.0f}"
+        f"&CRS=EPSG:2180&RESPONSE_CRS=EPSG:2180&WIDTH={w}&HEIGHT={h}",
+        timeout=40, retries=1)
+    if not data.lstrip().lower().startswith(b"ncols"):
+        raise DataSourceError(f"Usługa NMT (ASCII) nie zwróciła siatki: {data[:200]!r}")
+    from rasterio.io import MemoryFile
+
+    with MemoryFile(data) as mem, mem.open(driver="AAIGrid") as src:
+        dem = src.read(1).astype(np.float64)
+        transform = src.transform
+        if src.nodata is not None:
+            dem[dem == src.nodata] = np.nan
+    dem[(dem < -100) | (dem > 3000)] = np.nan
+    return dem, transform
+
+
+def _download_dem(parcel: Parcel, bounds):
+    minx, miny, maxx, maxy = bounds
     maxx, maxy = np.ceil(maxx), np.ceil(maxy)
     # Parametr SUBSET występuje dwa razy (oś x i y), więc URL składamy ręcznie.
     # Oś x = easting, y = northing w układzie PUWG 1992 (EPSG:2180).
     data = get_bytes(
         WCS_URL + f"?SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID={COVERAGE}"
         f"&FORMAT=image/tiff&SUBSET=x({minx:.0f},{maxx:.0f})&SUBSET=y({miny:.0f},{maxy:.0f})",
-        timeout=180)
+        timeout=120, retries=1)  # dłużej nie czekamy; analiza ma własny budżet czasu (analysis.SOURCE_BUDGET_S)
     if not data.startswith(b"II") and not data.startswith(b"MM"):
         raise DataSourceError(f"Usługa NMT nie zwróciła pliku TIFF: {data[:200]!r}")
     with rasterio.open(io.BytesIO(data)) as src:
@@ -140,10 +181,19 @@ def _accumulate(filled: np.ndarray, fdir: np.ndarray) -> np.ndarray:
 
 
 def analyse(parcel: Parcel) -> Terrain:
-    dem1, tr1 = _download_dem(parcel)
-    dem, tr = _aggregate(dem1, tr1, CELL_M)
+    bounds, partial = _window(parcel)
+    try:
+        dem1, tr1 = _download_dem_ascii(bounds)
+        k = int(round(CELL_M / abs(tr1.a)))
+    except DataSourceError:
+        dem1, tr1 = _download_dem(parcel, bounds)  # zapasowo GeoTIFF 1 m
+        k = CELL_M
+    dem, tr = _aggregate(dem1, tr1, max(1, k))
     cell_area = CELL_M * CELL_M
     mask = rasterize([(parcel.geom_2180, 1)], out_shape=dem.shape, transform=tr, fill=0, dtype="uint8").astype(bool)
+    if partial:  # okno ucina działkę: krawędzie okna nie są prawdziwą granicą działki
+        mask[:2, :] = mask[-2:, :] = False
+        mask[:, :2] = mask[:, -2:] = False
     if mask.sum() < 4:
         raise DataSourceError("Działka jest za mała dla analizy terenu (poniżej ~100 m²).")
 
@@ -169,7 +219,10 @@ def analyse(parcel: Parcel) -> Terrain:
             continue
         dy, dx, _ = _NB[k]
         ny, nx = y + dy, x + dx
-        if not (0 <= ny < h and 0 <= nx < w) or not mask[ny, nx]:
+        inside_grid = 0 <= ny < h and 0 <= nx < w
+        if partial and (not inside_grid or ny < 2 or nx < 2 or ny >= h - 2 or nx >= w - 2):
+            continue  # „odpływ” przez sztuczną krawędź okna analizy
+        if not inside_grid or not mask[ny, nx]:
             outs.append((acc[y, x] * cell_area / 10_000, y, x))
     outs.sort(reverse=True)
     outflow = []
@@ -224,4 +277,5 @@ def analyse(parcel: Parcel) -> Terrain:
         depressions=deps[:3],
         inflow_area_ha=round(inflow_ha, 2),
         concentrated_flow_share_pct=round(float(conc.sum() / mask.sum() * 100), 1),
+        partial=partial,
     )

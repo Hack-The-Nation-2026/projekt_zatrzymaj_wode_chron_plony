@@ -16,6 +16,16 @@ Specyfikacja serwera **[plan]**, który opakowuje rdzeń `wodnik/` dla interfejs
 | POST | `/analyses/{id}/report` | raport AI | 6 Raport |
 | GET | `/analyses/{id}/report` | pobierz wygenerowany raport | 6 Raport |
 | GET | `/demo` | lista przykładowych działek | 1 Start |
+| POST | `/auth/register` | załóż konto (od razu loguje) | 8 Logowanie |
+| POST | `/auth/login` | zaloguj, zwraca token | 8 Logowanie |
+| POST | `/auth/logout` | unieważnij token | 9 Profil |
+| GET | `/me` | dane zalogowanego użytkownika | 9 Profil |
+| GET | `/me/reports` | historia raportów | 9 Profil |
+| GET | `/me/reports/{id}` | pełny raport z historii | 9 → 3 |
+| GET | `/me/reports/{id}/raport` | raport z historii do druku (HTML) | 9 Profil |
+| DELETE | `/me/reports/{id}` | usuń raport z historii | 9 Profil |
+| POST | `/me/reports` | dopisz gotową analizę do historii | 3 Wynik |
+| POST | `/chat` | asystent: odpowiedź na pytanie o raport | 3 Wynik |
 
 ## Konwencje
 
@@ -140,11 +150,11 @@ Wynik lub postęp. Front odpytuje co 1–2 s, dopóki `status` ≠ `running`.
     "data_sources": [ "GUGiK – ULDK", "Open-Meteo archive (ERA5/ERA5-Land)" ],
     "raw": { "kbw60_mm": -127.0, "wyczerpanie_mm": 69.0, "TAW_mm": 106.0, "RAW_mm": 58.0 },
     "scenarios": {
-      "horizon_days": 30, "years": 31, "in_stress_now": false, "level": "umiarkowane",
+      "horizon_days": 30, "years": 10, "in_stress_now": false, "level": "umiarkowane",
       "p_stress_14": 0.35, "p_stress_30": 0.55, "p_severe_30": 0.2, "p_recovery_30": 0.0,
       "median_onset_day": 12, "water_needed_p50_mm": 38.0, "water_needed_p90_mm": 74.0,
       "forecast_days_used": 0,
-      "summary": "W 11 z 31 scenariuszy pogodowych roślina wejdzie w stres wodny w ciągu 14 dni, a w 17 z 31 w ciągu 30 dni.",
+      "summary": "W 4 z 10 scenariuszy pogodowych roślina wejdzie w stres wodny w ciągu 14 dni, a w 6 z 10 w ciągu 30 dni.", "period": "2016–2025",
       "envelope": [ { "day": 1, "date": "2026-06-16", "p10": 52.1, "p50": 55.0, "p90": 57.3 } ] } },
   "timeseries": [ { "date": "2026-06-14", "precip": 0.0, "et0": 4.8, "depletion": 66.1, "raw_threshold": 58.0 } ],
   "meta": { "computed_ms": 6400, "from_cache": ["uldk", "weather"], "rules_version": "0.1.0" } }
@@ -208,11 +218,122 @@ Zwraca ostatnio wygenerowany raport (ten sam format) lub `404`.
 ### `GET /demo`
 
 ```json
-[ { "id": "demo-lazisko", "title": "Łazisko, pszenica, czerwiec 2026", "parcel_id": "101609_2.0011.352",
-    "date": "2026-06-15", "crop": "pszenica_ozima", "analysis_id": "demo-lazisko" } ]
+[ { "id": "demo-lazisko_352_2026_06_15", "title": "Łazisko, pszenica, czerwiec 2026", "parcel_id": "101609_2.0011.352",
+    "date": "2026-06-15", "crop": "pszenica_ozima", "analysis_id": "demo-lazisko_352_2026_06_15" } ]
 ```
 
-Wynik jest zapisany w `demo/`, ładowany bez sieci przez `GET /analyses/demo-lazisko`.
+Wynik jest zapisany w `demo/`, ładowany bez sieci przez `GET /analyses/demo-lazisko_352_2026_06_15`.
+
+---
+
+## Dane do wykresów (`report.charts`)
+
+W pełnym wyniku (`GET /analyses/{id}` → `report`, a także w raportach z historii) jest pole `charts`.
+Starsze wyniki (np. stare demo) go nie mają, więc frontend musi to obsłużyć.
+
+```json
+"charts": {
+  "daily": {                                   // dzień po dniu, ok. 150 dni do daty analizy włącznie
+    "dates": ["2026-01-16", "…", "2026-06-15"],
+    "precip_mm": [0.0, 4.2, null, "…"],         // opad (ERA5); null = brak danych
+    "et0_mm": [0.6, 0.8, "…"],                  // parowanie referencyjne ET0
+    "water_left_mm": [106.0, "…", 37.2],        // zapas wody dostępnej dla roślin = TAW − wyczerpanie (FAO-56)
+    "taw_mm": 106.0,                            // pełny zapas (góra osi)
+    "stress_below_mm": 47.7                     // poniżej tego zapasu roślina jest w stresie (TAW − RAW)
+  },
+  "years": {
+    "items": [ { "year": 2016, "kbw60_mm": -41.3, "current": false }, "…",
+               { "year": 2026, "kbw60_mm": -126.8, "current": true } ],
+    "deficit_threshold_mm": -100.0,             // próg „roku z wyraźnym deficytem”
+    "label": "bilans opad − parowanie z 60 dni przed 15.06"
+  }
+}
+```
+
+Wykres zapasu wody łączy się ze scenariuszami: ostatni punkt `water_left_mm` to „dziś”, a `scenarios.envelope`
+(dni 1–30) to dalszy ciąg. Wyrażony jest jako wyczerpanie, więc na wykresie rysuje się `taw_mm − p50` itd.
+Gotowe rysowanie: `web/charts.js` (SVG jako tekst), `web/Charts.jsx` (komponenty React), `wodnik/charts.py`
+(raport do druku).
+
+---
+
+## „Co da retencja” (`report.what_if`)
+
+```json
+"what_if": {
+  "summary": "Przy ulewie 50 mm z działki i sąsiednich pól spłynie ok. 1026 m³ wody …",
+  "storms": [ { "rain_mm": 30, "runoff_mm": 1.7, "volume_parcel_m3": 51, "volume_inflow_m3": 137, "volume_total_m3": 188 },
+              { "rain_mm": 50, "runoff_mm": 9.3, "volume_parcel_m3": 280, "volume_inflow_m3": 747, "volume_total_m3": 1026 } ],
+  "measures": [ { "key": "wal", "name": "Wał lub próg w miejscu odpływu", "value": 433, "unit": "m", "detail": "…" },
+                { "key": "oczko", "name": "Oczko wodne lub mokradło w naturalnym obniżeniu", "value": 781, "unit": "m³", "detail": "…" },
+                { "key": "materia", "name": "Więcej materii organicznej …", "value": 5.2, "unit": "mm", "detail": "…" } ],
+  "root_zone": { "taw_before_mm": 106, "taw_after_mm": 111.2, "stress_days_season_before": 47, "stress_days_season_after": 46, "…": "…" },
+  "curve_number": 75, "hydrologic_group": "B", "parcel_ha": 3.01, "inflow_ha": 8.04, "slope_pct": 1.9,
+  "assumptions": ["…"]
+}
+```
+
+`wal` i `oczko` są tylko wtedy, gdy jest analiza terenu (NMT); `materia` – gdy są dane glebowe. Starsze wyniki nie mają
+pola `what_if`. Dlaczego ulewa, a nie cały sezon: dobowe opady ERA5 to średnia dla obszaru 9–25 km i rzadko przekraczają
+15–20 mm, więc metoda SCS-CN nie widzi w nich spływu (opis w `wodnik/whatif.py`). W frontendzie: `report.whatIf`, `WhatIf.jsx`.
+
+---
+
+## Asystent (`POST /chat`)
+
+```json
+// żądanie: historia rozmowy (ostatnia wiadomość od użytkownika) i raport, o który pytamy (opcjonalnie)
+{ "messages": [ { "role": "user", "content": "Co zrobić najpierw?" } ],
+  "analysis_id": "a1b2c3d4e5" }          // albo "report_id": 3 (raport z historii, wymaga tokena)
+// odpowiedź
+{ "reply": "…", "source": "ai", "model": "gpt-5.4-mini" }   // source "fallback": bez AI, skrót z raportu
+```
+
+Model: OpenAI przez LangChain (`api/chat.py`), klucz `OPENAI_API_KEY` w `.env`, model `WODNIK_CHAT_MODEL`.
+Bez klucza albo przy błędzie modelu serwer zwraca `source: "fallback"` (najważniejsze wnioski z raportu), więc czat
+nigdy nie psuje aplikacji. Limity: do 40 wiadomości, 4000 znaków na wiadomość, limit pytań na IP (`429`).
+Model dostaje opis raportu bez geometrii i danych konta. W frontendzie: `api.chat({ messages, report })`.
+
+---
+
+## Konto i historia raportów
+
+Konto jest opcjonalne: analiza działa bez logowania. Zalogowany użytkownik dostaje każdy wynik także w swojej
+historii, która przetrwa restart serwera (SQLite, plik `data/wodnik.db`, zmienna `WODNIK_DB`).
+
+**Uwierzytelnienie:** nagłówek `Authorization: Bearer <token>`. Token jest ważny 30 dni; serwer trzyma tylko jego
+skrót SHA-256. Hasła: PBKDF2-HMAC-SHA256, 200 000 iteracji, losowa sól. Logowanie i rejestracja mają limit prób na IP.
+
+### `POST /auth/register` i `POST /auth/login`
+
+```json
+// żądanie (name tylko przy rejestracji, opcjonalne; hasło min. 8 znaków)
+{ "email": "jan@example.com", "password": "********", "name": "Jan" }
+// odpowiedź: 201 (rejestracja) / 200 (logowanie)
+{ "token": "…", "user": { "id": 1, "email": "jan@example.com", "name": "Jan", "created_at": "2026-11-21T16:41:44Z" } }
+```
+
+Błędy: `400 INVALID_INPUT` (zły e-mail, za krótkie hasło), `409 EMAIL_TAKEN`, `401 BAD_CREDENTIALS`
+(ten sam komunikat dla złego e-maila i złego hasła), `429 RATE_LIMITED`.
+
+### `POST /auth/logout` → `204`. `GET /me` → użytkownik + `reports_count`, bez tokena `401 UNAUTHORIZED`.
+
+### `GET /me/reports`
+
+```json
+[ { "id": 3, "analysis_id": "a1b2c3d4e5", "parcel_id": "101609_2.0011.352", "place": "Łazisko, gm. Tomaszów Mazowiecki",
+    "date": "2026-06-15", "crop": "pszenica ozima", "risk_level": "wysokie", "saved_at": "2026-11-21T16:41:45Z" } ]
+```
+
+Najnowsze pierwsze. `GET /me/reports/{id}` zwraca to samo plus `report` (pełny wynik jak w `GET /analyses/{id}`).
+Cudzy lub nieistniejący raport: `404`. Ta sama analiza trafia do historii tylko raz.
+
+**Kiedy raport trafia do historii:** automatycznie, gdy `POST /analyses` wysłano z tokenem (także dla działek demo
+i wyników z pamięci podręcznej). Gotową analizę zrobioną przed zalogowaniem można dopisać przez
+`POST /me/reports` z `{ "analysis_id": "…" }`.
+
+**Raport do druku z historii** wymaga tokena, więc zwykły link nie zadziała; frontend pobiera HTML z nagłówkiem
+i otwiera go jako blob (gotowe w `web/api.js`: `api.openReportHtml(id)`).
 
 ---
 

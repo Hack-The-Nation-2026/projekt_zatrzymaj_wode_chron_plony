@@ -428,27 +428,7 @@ export default function App() {
     Wodnik
   </strong>
   <div className="topbar-actions">
-    <button
-      className="btn dark icon-btn"
-      onClick={handleReset}
-      aria-label="Strona główna"
-      title="Strona główna"
-    >
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M3 11.5 12 4l9 7.5" />
-        <path d="M5 10v10h5v-6h4v6h5V10" />
-      </svg>
-    </button>
+
     <button
       className="btn dark"
       style={{ height: 38, padding: "0 16px" }}
@@ -460,7 +440,7 @@ export default function App() {
       <>
         <button className="btn" style={{ height: 38, padding: "0 16px" }} onClick={() => setView("profile")}
                 title={user.email}>
-          {user.name || "Moje konto"} · raporty
+          Twoje raporty
         </button>
         <button className="btn" style={{ height: 38, padding: "0 16px" }} onClick={handleLogout}>Wyloguj</button>
       </>

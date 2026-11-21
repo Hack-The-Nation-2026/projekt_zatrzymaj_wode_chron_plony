@@ -153,7 +153,7 @@ export default function Landing({ onAuth, onGuest }) {
           <div className="eyebrow">HackNation 2026 · zadanie KOWR</div>
           <h1>Zatrzymaj wodę,<br />chroń plony</h1>
           <p className="lp-lead">
-            Wpisz numer działki i datę. Wodnik sprawdzi, czy Twoim roślinom brakuje wody, wyjaśni dlaczego
+            Wpisz numer datę i wskaż działkę. Wodnik sprawdzi, czy Twoim roślinom brakuje wody, wyjaśni dlaczego
             i wskaże, gdzie na polu ją zatrzymać. Na danych publicznych, za darmo, w kilka minut.
           </p>
           <div className="lp-cta">

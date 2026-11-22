@@ -312,4 +312,6 @@ demo opisuje [docs/WDROZENIE.md](docs/WDROZENIE.md).
 | [docs/API.md](docs/API.md) | zapytania do serwera (endpointy, żądania, odpowiedzi, błędy) |
 | [docs/UI.md](docs/UI.md) | strony interfejsu i zasady prostoty obsługi |
 | [docs/WDROZENIE.md](docs/WDROZENIE.md) | wdrożenie demo (Vercel + FastAPI Cloud), zmienne środowiskowe, workflowy |
+| [docs/SCENARIUSZ_FILMU.md](docs/SCENARIUSZ_FILMU.md) | scenariusz filmu i napisy do lektora |
+| [video/README.md](video/README.md) | film (`video/out/prezentacja.mp4`, 2 min 55 s) i sposób jego odtworzenia |
 | [docs/RAPORT_AI.md](docs/RAPORT_AI.md) | projekt opcjonalnego raportu AI |

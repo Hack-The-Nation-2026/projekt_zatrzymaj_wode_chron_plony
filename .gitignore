@@ -9,6 +9,3 @@ web/dist/
 web/.vite/
 data/
 .env
-
-# Film promocyjny (nagrania i render) – patrz video/README.md
-video/

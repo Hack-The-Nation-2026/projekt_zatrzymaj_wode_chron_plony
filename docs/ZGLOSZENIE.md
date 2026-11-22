@@ -43,6 +43,6 @@ w Polsce; KOWR może je przejąć i rozwijać (otwarte licencje).
 | link do prywatnego repozytorium + dostęp dla jury | GitHub (Hack-The-Nation-2026) | ☐ sprawdzić prywatność, dodać konta jury wg instrukcji z platformy |
 | dokumentacja README | [README.md](../README.md) (9 punktów z pkt 4.2) | ✔ |
 | prezentacja PDF do 10 slajdów | pitch deck (eksport do PDF) | ☐ zaktualizować nazwę na Wodnik, dodać satelitę, hydrologię, scenariusze i zrzuty ekranu |
-| działający prototyp + instrukcja uruchomienia | README pkt 1 | ✔ (☐ ewentualnie link do wersji online) |
-| film do 3 minut | – | ☐ nagrać: wybór działki → raport → mapa → wydruk |
-| wygenerowane raporty | `GET /api/v1/analyses/{id}/raport` → zapis jako PDF | ☐ wygenerować 2–3 raporty dla różnych regionów i upraw |
+| działający prototyp + instrukcja uruchomienia | README pkt 1; demo online: <https://wodnik.vercel.app> (API: <https://wodnik-api.fastapicloud.dev>) | ✔ |
+| film do 3 minut | [`video/out/prezentacja.mp4`](../video/out/prezentacja.mp4) — 2 min 55 s, 1920×1080, bez dźwięku | ✔ |
+| wygenerowane raporty | `GET /api/v1/analyses/{id}/raport` → wydruk lub PDF | ☐ wygenerować 2–3 raporty dla różnych regionów i upraw |

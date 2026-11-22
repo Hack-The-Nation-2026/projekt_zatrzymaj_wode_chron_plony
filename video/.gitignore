@@ -1,0 +1,7 @@
+node_modules/
+
+# Nagrania źródłowe, znaczniki, klatki kontrolne i zrzuty z pomiarów: odtwarzalne
+# skryptami z scripts/. Do repozytorium wchodzi tylko gotowy film.
+public/clips/
+out/*
+!out/prezentacja.mp4

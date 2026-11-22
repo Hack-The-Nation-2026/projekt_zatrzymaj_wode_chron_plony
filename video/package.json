@@ -1,0 +1,24 @@
+{
+  "name": "wodnik-video",
+  "version": "1.0.0",
+  "description": "Film promocyjny Wodnika (HackNation 2026, zadanie KOWR)",
+  "main": "index.js",
+  "scripts": {
+    "record": "node scripts/record.mjs all",
+    "plan": "node scripts/plan.mjs",
+    "render": "npx remotion render src/index.ts Wodnik out/prezentacja.mp4 --codec h264 --crf 20",
+    "studio": "npx remotion studio src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@remotion/cli": "^4.0.545",
+    "@remotion/google-fonts": "^4.0.545",
+    "playwright": "^1.65.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "remotion": "^4.0.545"
+  }
+}

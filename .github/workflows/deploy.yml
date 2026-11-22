@@ -1,0 +1,32 @@
+name: Deploy API to FastAPI Cloud
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "api/**"
+      - "wodnik/**"
+      - "demo/**"
+      - "pyproject.toml"
+      - "requirements.txt"
+      - ".python-version"
+      - ".github/workflows/deploy.yml"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # setup-uv v10.3.2
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e
+        with:
+          version: "latest-known"
+      # Aplikacja siedzi w korzeniu repozytorium (api/ + wodnik/), więc deploy
+      # uruchamiamy tutaj. CLI bierzemy z efemerycznego środowiska `uvx`, żeby CI
+      # nie instalowało ciężkich zależności analizy (rasterio, scipy) — robi to
+      # dopiero obraz na FastAPI Cloud. Token i identyfikator aplikacji ustawia
+      # `fastapi cloud setup-ci` (sekrety repozytorium).
+      - run: uvx --from "fastapi[standard]" fastapi deploy
+        env:
+          FASTAPI_CLOUD_TOKEN: ${{ secrets.FASTAPI_CLOUD_TOKEN }}
+          FASTAPI_CLOUD_APP_ID: ${{ secrets.FASTAPI_CLOUD_APP_ID }}

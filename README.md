@@ -44,6 +44,9 @@ Na Windows zamiast `.venv/bin/` użyj `.venv\Scripts\`.
 **Asystent AI (opcjonalnie):** skopiuj `.env.example` do `.env` i wpisz `OPENAI_API_KEY`. Serwer wczytuje `.env`
 przy starcie; plik nie trafia do repozytorium. Bez klucza czat działa w trybie podstawowym (skrót z raportu).
 
+**Demo online (bez uruchamiania):** <https://wodnik.vercel.app> — front z Vercela, API z FastAPI Cloud
+([docs/WDROZENIE.md](docs/WDROZENIE.md)).
+
 | Adres | Co |
 |---|---|
 | <http://localhost:8000> | aplikacja dla rolnika (React, `web/`) |
@@ -289,6 +292,17 @@ Każdy raport zawiera listę ograniczeń dotyczących tej analizy. Ogólnie:
 - Limit nowych analiz na adres IP, ograniczenie liczby zadań w pamięci, limity czasu dla zewnętrznych usług.
 - CORS ustawiany zmienną `WODNIK_CORS_ORIGIN`; brak kluczy i sekretów w repozytorium.
 
+## Wdrożenie (demo online)
+
+Wersja demo działa bez instalowania czegokolwiek: interfejs na
+<https://wodnik.vercel.app>, API na <https://wodnik-api.fastapicloud.dev>. Front wysyła zapytania
+pod `/api/...`, a `web/vercel.json` przekierowuje je na backend, więc adres API nie jest wbudowany
+w kod frontu.
+
+Klucz `OPENAI_API_KEY` i `WODNIK_CHAT_MODEL` siedzą w zmiennych środowiskowych FastAPI Cloud
+(sekret), nie w repozytorium. Szczegóły, lista zmiennych, wdrożenia z GitHuba i znane ograniczenia
+demo opisuje [docs/WDROZENIE.md](docs/WDROZENIE.md).
+
 ## Dokumentacja szczegółowa
 
 | Dokument | Zawartość |
@@ -297,4 +311,5 @@ Każdy raport zawiera listę ograniczeń dotyczących tej analizy. Ogólnie:
 | [docs/ARCHITEKTURA.md](docs/ARCHITEKTURA.md) | struktura projektu, przepływ analizy, kontrakt danych |
 | [docs/API.md](docs/API.md) | zapytania do serwera (endpointy, żądania, odpowiedzi, błędy) |
 | [docs/UI.md](docs/UI.md) | strony interfejsu i zasady prostoty obsługi |
+| [docs/WDROZENIE.md](docs/WDROZENIE.md) | wdrożenie demo (Vercel + FastAPI Cloud), zmienne środowiskowe, workflowy |
 | [docs/RAPORT_AI.md](docs/RAPORT_AI.md) | projekt opcjonalnego raportu AI |

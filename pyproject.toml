@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wodnik-api"
+version = "0.1.0"
+description = "Wodnik – cyfrowy asystent wody na działce rolnej (HackNation 2026, zadanie KOWR)"
+# Ta sama lista co w requirements.txt. FastAPI Cloud czyta zależności stąd,
+# więc zmieniając jedną listę, zmień drugą.
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "fastapi[standard]>=0.115",
+  "numpy>=1.26",
+  "requests>=2.31",
+  "urllib3<2",
+  "rasterio>=1.3",
+  "shapely>=2.0",
+  "pyproj>=3.6",
+  "scipy>=1.11",
+  "langchain-openai>=0.3",
+]
+
+# Repozytorium jest „flat”: obok kodu aplikacji leżą `web/`, `demo/`, `tests/`
+# i materiały. Bez tej sekcji setuptools zgłasza „Multiple top-level packages
+# discovered in a flat-layout” i przerywa budowanie obrazu w FastAPI Cloud.
+# Wskazujemy więc jawnie dwa pakiety, które tworzą aplikację.
+[tool.setuptools]
+packages = ["api", "wodnik"]
+
+# Bez tego `uv sync` próbuje zbudować projekt jako pakiet, a katalog nie ma
+# struktury pakietu instalowalnego. FastAPI Cloud instaluje projekt po swojemu.
+[tool.uv]
+package = false
+
+# Wejście aplikacji podane wprost, żeby wdrożenie nie zależało od autodetekcji.
+[tool.fastapi]
+entrypoint = "api.main:app"

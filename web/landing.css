@@ -19,16 +19,17 @@
 .lp-links a:hover { color: #fff; }
 .lp-nav-btn { height: 38px; text-decoration: none; }
 
-.lp-hero { max-width: 1160px; margin: 0 auto; padding: 28px 24px 80px; display: grid; grid-template-columns: 1.25fr 0.9fr; gap: 40px; align-items: start; }
+/* Pierwszy ekran: cała wysokość okna pod paskiem menu (ok. 76 px), treść i logowanie wyśrodkowane w pionie */
+.lp-hero { max-width: 1160px; margin: 0 auto; padding: 32px 24px 56px; display: grid; grid-template-columns: 1.25fr 0.9fr; gap: 40px;
+  align-items: center; align-content: center; min-height: calc(100vh - 76px); box-sizing: border-box; }
 .lp-hero h1 { font-size: 52px; line-height: 1.05; margin: 8px 0 16px; }
 .lp-lead { font-size: 18px; color: #c7d5e0; max-width: 560px; margin: 0 0 24px; }
 .lp-cta { display: flex; gap: 12px; flex-wrap: wrap; }
 .lp-cta .btn { text-decoration: none; }
 .lp-hero .lp-preview { max-width: 560px; margin-top: 32px; }
-.lp-hero-spacer { height: 96px; }
 .lp-preview-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #63b34e; margin-bottom: 8px; }
 
-.lp-auth { background: #132535; border: 1px solid #22394d; border-radius: 18px; padding: 24px; box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35); position: sticky; top: 24px; scroll-margin-top: 24px; }
+.lp-auth { background: #132535; border: 1px solid #22394d; border-radius: 18px; padding: 24px; box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35); scroll-margin-top: 96px; }
 .lp-tabs { display: grid; grid-template-columns: 1fr 1fr; background: #0a1620; border: 1px solid #22394d; border-radius: 999px; padding: 4px; margin-bottom: 8px; }
 .lp-tabs button { height: 38px; border: 0; border-radius: 999px; background: transparent; color: #9db0c0; font-weight: 600; cursor: pointer; }
 .lp-tabs button.on { background: #4d8b3c; color: #fff; }
@@ -83,6 +84,7 @@
 
 @media (max-width: 900px) {
   .lp-hero, .lp-pitch { grid-template-columns: 1fr; }
+  .lp-hero { min-height: 0; }
   .lp-auth { position: static; }
   .lp-steps { grid-template-columns: 1fr 1fr; }
   .lp-sources { grid-template-columns: 1fr 1fr; }
@@ -185,3 +187,11 @@
 .lp-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .lp-legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
 .lp-legend i.dashed { background: repeating-linear-gradient(90deg, #ff8a80 0 4px, transparent 4px 7px); }
+/* strona startowa na wąskim ekranie: linki do sekcji chowamy, zostaje logo, wielkość czcionki i „Zaloguj się” */
+@media (max-width: 760px) {
+  .lp-nav-link { display: none !important; }
+}
+@media (max-width: 640px) {
+  .topbar .font-size-picker { height: 34px; }
+  .topbar .font-size-btn { padding: 0 8px; }
+}

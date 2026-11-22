@@ -182,13 +182,13 @@ export default function Landing({ onAuth, onGuest }) {
           </div>
         </div>
         <div className="topbar-actions">
-          <a className="btn" style={{ height: 38, padding: "0 16px", textDecoration: "none", borderRadius: "999px" }} href="#jak">
+          <a className="btn lp-nav-link" style={{ height: 38, padding: "0 16px", textDecoration: "none", borderRadius: "999px" }} href="#jak">
             Jak to działa?
           </a>
-          <a className="btn" style={{ height: 38, padding: "0 16px", textDecoration: "none", borderRadius: "999px" }} href="#dane">
+          <a className="btn lp-nav-link" style={{ height: 38, padding: "0 16px", textDecoration: "none", borderRadius: "999px" }} href="#dane">
             Dane
           </a>
-          <a className="btn" style={{ height: 38, padding: "0 16px", textDecoration: "none", borderRadius: "999px" }} href="#model">
+          <a className="btn lp-nav-link" style={{ height: 38, padding: "0 16px", textDecoration: "none", borderRadius: "999px" }} href="#model">
             Model
           </a>
           <a className="btn dark" style={{ height: 38, padding: "0 16px", textDecoration: "none", borderRadius: "999px" }} href="#logowanie">
@@ -197,7 +197,7 @@ export default function Landing({ onAuth, onGuest }) {
         </div>
       </header>
 
-      <header className="lp-hero" style={{ marginTop: "28px", marginBottom: "96px" }}>
+      <header className="lp-hero">
         <div className="lp-hero-text">
           <div className="eyebrow">HackNation 2026 · zadanie KOWR</div>
           <h1>Zatrzymaj wodę,<br />chroń plony</h1>
@@ -209,7 +209,6 @@ export default function Landing({ onAuth, onGuest }) {
             <a className="btn dark" href="#logowanie">Załóż darmowe konto</a>
             <button type="button" className="btn" onClick={onGuest}>Sprawdź działkę bez konta</button>
           </div>
-          <div className="lp-hero-spacer" aria-hidden="true" />
           {/* <ReportPreview /> */}
         </div>
         <AuthCard onAuth={onAuth} onGuest={onGuest} />

@@ -148,11 +148,13 @@ def _parcel_map_svg(d: dict) -> str:
     svg = (f'<svg viewBox="0 0 {w} {h}" width="{w}" height="{h}" role="img" aria-label="Szkic granic działki" '
            f'style="background:#fafcfa;border:1px solid #d8e0da;border-radius:6px;flex-shrink:0">'
            f'{"".join(polys)}{"".join(markers)}{north}</svg>')
+    # Python 3.9: w wyrażeniu f-stringa nie może być odwrotnego ukośnika, więc tekst zastępczy liczymy osobno.
+    legend_html = legend or "<div style='font-size:12px;color:#555;margin-top:3px'>Kontur działki z GUGiK ULDK.</div>"
     return (f"<div style='display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:10px 0'>"
             f"{svg}<div style='flex:1;min-width:220px'>"
             f"<div style='font-size:12.5px;font-weight:700;color:#1b2e30'>Szkic granic działki i wskazanych punktów</div>"
             f"<div style='font-size:12px;color:#555'>Środek działki: {d['parcel']['srodek']['lat']}, {d['parcel']['srodek']['lon']}</div>"
-            f"{legend or '<div style=\"font-size:12px;color:#555;margin-top:3px\">Kontur działki z GUGiK ULDK.</div>'}"
+            f"{legend_html}"
             f"</div></div>")
 
 
@@ -344,6 +346,10 @@ def pdf_report(d: dict) -> bytes:
         r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",
         r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",  # macOS
+        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
     ]
     browser = next((b for b in candidates if b and Path(b).exists()), None)
     if not browser:

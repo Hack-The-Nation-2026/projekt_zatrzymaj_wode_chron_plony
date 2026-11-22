@@ -22,7 +22,7 @@ from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -223,9 +223,29 @@ def my_report(report_id: int, user: dict = Depends(current_user)):
     return _my_report(user, report_id)
 
 
+def _pdf_response(report: dict) -> Response:
+    try:
+        pdf_bytes = output.pdf_report(report)
+    except Exception as exc:
+        _err(500, "PDF_ERROR", f"Nie udało się wygenerować pliku PDF: {exc}")
+    pid = re.sub(r"[^A-Za-z0-9_.-]+", "_", str((report.get("parcel") or {}).get("id") or "dzialka"))
+    d_str = re.sub(r"[^0-9-]+", "", str(report.get("date") or ""))
+    fname = f"raport_{pid}_{d_str}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @app.get("/api/v1/me/reports/{report_id}/raport", response_class=HTMLResponse)
 def my_report_html(report_id: int, user: dict = Depends(current_user)):
     return HTMLResponse(output.html_report(_my_report(user, report_id)["report"]))
+
+
+@app.get("/api/v1/me/reports/{report_id}/raport.pdf")
+def my_report_pdf(report_id: int, user: dict = Depends(current_user)):
+    return _pdf_response(_my_report(user, report_id)["report"])
 
 
 @app.delete("/api/v1/me/reports/{report_id}", status_code=204)
@@ -437,6 +457,15 @@ def get_report_html(job_id: str):
     if not job or job["status"] != "done":
         _err(404, "NOT_FOUND", "Analiza nie istnieje lub jeszcze trwa.")
     return HTMLResponse(output.html_report(job["report"]))
+
+
+@app.get("/api/v1/analyses/{job_id}/raport.pdf")
+def get_report_pdf(job_id: str):
+    """Pobiera wygenerowany plik PDF raportu (ten sam szablon co HTML)."""
+    job = _jobs.get(job_id)
+    if not job or job["status"] != "done":
+        _err(404, "NOT_FOUND", "Analiza nie istnieje lub jeszcze trwa.")
+    return _pdf_response(job["report"])
 
 
 # --- działki demo: gotowe wyniki z katalogu demo/, działają bez sieci i bez limitów API ---------

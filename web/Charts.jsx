@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import * as charts from "./charts.js";
 
 // Gotowe wykresy do raportu (dane: report.charts i report.scenarios z api.js → toView).
@@ -14,32 +14,22 @@ import * as charts from "./charts.js";
 const Svg = ({ html }) => <div className="chart" dangerouslySetInnerHTML={{ __html: html }} />;
 // SVG budujemy sami z liczb z serwera, a każdy tekst jest escapowany w charts.js.
 
-/** Karta „Jak doszło do tej sytuacji”: zapas wody (z dalszym ciągiem scenariuszy) albo opad i parowanie. */
+/** Karta „Jak doszło do tej sytuacji”: zapas wody (z dalszym ciągiem scenariuszy) oraz opad i parowanie jeden pod drugim. */
 export function HistoryChart({ charts: c, scenarios }) {
-  const [tab, setTab] = useState("water");
   if (!c?.daily) return null;
   return (
     <div className="step-card history-chart">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>JAK DOSZŁO DO TEJ SYTUACJI</div>
-        <div className="chart-tabs" role="tablist">
-          <button type="button" role="tab" aria-selected={tab === "water"} className={tab === "water" ? "on" : ""}
-                  onClick={() => setTab("water")}>Woda w glebie</button>
-          <button type="button" role="tab" aria-selected={tab === "rain"} className={tab === "rain" ? "on" : ""}
-                  onClick={() => setTab("rain")}>Opad i parowanie</button>
-        </div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: "#555", marginBottom: 8 }}>JAK DOSZŁO DO TEJ SYTUACJI?</div>
+
+      <div style={{ fontSize: 13, fontWeight: 600, marginTop: 4 }}>Woda w glebie</div>
+      <Svg html={charts.water(c, scenarios)} />
+      <div style={{ fontSize: 12, color: "#666", marginBottom: 18 }}>
+        Zapas wody dostępnej dla roślin (bilans FAO-56). Po prawej: 30 dni naprzód, linia przerywana to typowy
+        scenariusz, pasmo to rozrzut.
       </div>
-      {tab === "water" ? (
-        <>
-          <Svg html={charts.water(c, scenarios)} />
-          <div style={{ fontSize: 12, color: "#666" }}>
-            Zapas wody dostępnej dla roślin (bilans FAO-56). Po prawej: 30 dni naprzód, linia przerywana to typowy
-            scenariusz, pasmo to rozrzut.
-          </div>
-        </>
-      ) : (
-        <Svg html={charts.rainEt(c)} />
-      )}
+
+      <div style={{ fontSize: 13, fontWeight: 600, marginTop: 12 }}>Opad i parowanie</div>
+      <Svg html={charts.rainEt(c)} />
     </div>
   );
 }

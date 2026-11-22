@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Document, Page, Text, View, StyleSheet, Font, pdf } from "@react-pdf/renderer";
 import "./styles.css";
+import { useFontSize } from "./useFontSize.js";
 import { api } from "./api.js";
 import Scenarios from "./Scenarios.jsx";
 import { HistoryChart, YearsChart } from "./Charts.jsx";
@@ -9,27 +9,13 @@ import WhatIf from "./WhatIf.jsx";
 import Landing from "./Landing.jsx";
 import Profile from "./Profile.jsx";
 
-Font.register({
-  family: "Roboto",
-  fonts: [
-    { src: "https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-regular-webfont.ttf" },
-    { src: "https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-bold-webfont.ttf", fontWeight: 700 },
-  ],
-});
-
-const dedupeRecommendations = (recs = []) => {
-  const seen = new Set();
-  return recs.filter((r) => {
-    const key = `${r.step}|${r.title}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-};
-
 const groupRecommendations = (recs = []) => {
   const groups = [];
-  for (const r of dedupeRecommendations(recs)) {
+  const seen = new Set();
+  for (const r of recs) {
+    const key = `${r.step}|${r.title}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     let g = groups.find((x) => x.step === r.step);
     if (!g) {
       g = { step: r.step, items: [] };
@@ -38,84 +24,6 @@ const groupRecommendations = (recs = []) => {
     g.items.push(r);
   }
   return groups;
-};
-
-const s = StyleSheet.create({
-  page: { padding: 36, fontFamily: "Roboto", fontSize: 10, color: "#1a2a1f" },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14,
-            borderBottomWidth: 2, borderBottomColor: "#4a9d3f", paddingBottom: 8 },
-  title: { fontSize: 18, fontWeight: 700 },
-  meta: { fontSize: 9, color: "#4a5a50", marginBottom: 12 },
-  badge: { backgroundColor: "#fff3cd", color: "#8a6d00", padding: "4 10", borderRadius: 10, fontSize: 9, fontWeight: 700 },
-  row: { flexDirection: "row", gap: 12, marginBottom: 12 },
-  card: { flex: 1, borderWidth: 1, borderColor: "#d8e0da", borderRadius: 6, padding: 10 },
-  cardLabel: { fontSize: 8, color: "#556", textTransform: "uppercase", marginBottom: 4, fontWeight: 700 },
-  table: { borderWidth: 1, borderColor: "#d8e0da", borderRadius: 6, marginTop: 6 },
-  trHead: { flexDirection: "row", backgroundColor: "#eef4ef", borderBottomWidth: 1, borderBottomColor: "#d8e0da", padding: "7 10" },
-  tr: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#e6ece8", padding: "8 10" },
-  thStep: { width: "24%", fontSize: 8, fontWeight: 700, color: "#2d4a34", textTransform: "uppercase" },
-  thAction: { width: "76%", fontSize: 8, fontWeight: 700, color: "#2d4a34", textTransform: "uppercase" },
-  tdStep: { width: "24%", fontSize: 9, fontWeight: 700, color: "#2b6e3f", paddingRight: 8 },
-  tdAction: { width: "76%", fontSize: 9 },
-  itemBlock: { marginBottom: 6 },
-});
-
-const ReportPdf = ({ report }) => {
-  const grouped = groupRecommendations(report.recommendations);
-  return (
-    <Document>
-      <Page size="A4" style={s.page}>
-        <View style={s.header}>
-          <Text style={s.title}>Raport niedoborów – Wodnik</Text>
-          <Text style={s.badge}>Ryzyko suszy: {report.risk_level}</Text>
-        </View>
-        <Text style={s.meta}>
-          Działka: {report.parcel?.id} ({report.parcel?.region})  |  Uprawa: {report.crop?.name}  |  Data analizy: {report.date}
-        </Text>
-        <View style={s.row}>
-          <View style={s.card}>
-            <Text style={s.cardLabel}>Główne przyczyny</Text>
-            <Text>{report.main_cause}</Text>
-            <Text style={{ marginTop: 3, color: "#445" }}>{report.secondary_cause}</Text>
-          </View>
-          <View style={s.card}>
-            <Text style={s.cardLabel}>Bilans wodny (FAO-56 / ERA5)</Text>
-            <Text>KBW (60 dni): {report.raw.kbw60_mm}</Text>
-            <Text>Wyczerpanie: {report.raw.depletion_mm} / TAW {report.raw.taw_mm}</Text>
-            <Text style={{ marginTop: 3, color: "#445" }}>{report.raw.percentile}</Text>
-          </View>
-        </View>
-        {report.scenarios && (
-          <View style={[s.card, { marginBottom: 12 }]}>
-            <Text style={s.cardLabel}>Co dalej: najbliższe {report.scenarios.horizon_days} dni ({report.scenarios.years} scenariuszy)</Text>
-            <Text>{report.scenarios.summary}</Text>
-            <Text style={{ marginTop: 3 }}>
-              Woda potrzebna, by uniknąć stresu: ok. {report.scenarios.water_needed_p50_mm} mm (suchy scenariusz: {report.scenarios.water_needed_p90_mm} mm)
-            </Text>
-          </View>
-        )}
-        <View style={s.table}>
-          <View style={s.trHead}>
-            <Text style={s.thStep}>Etap KOWR</Text>
-            <Text style={s.thAction}>Zalecane działania i uzasadnienie</Text>
-          </View>
-          {grouped.map((g, gi) => (
-            <View key={g.step} style={[s.tr, gi === grouped.length - 1 && { borderBottomWidth: 0 }]} wrap={false}>
-              <Text style={s.tdStep}>{g.step}</Text>
-              <View style={s.tdAction}>
-                {g.items.map((it, ii) => (
-                  <View key={ii} style={ii < g.items.length - 1 ? s.itemBlock : null}>
-                    <Text style={{ fontWeight: 700 }}>{it.title}</Text>
-                    <Text style={{ color: "#334", marginTop: 1 }}>{it.detail}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          ))}
-        </View>
-      </Page>
-    </Document>
-  );
 };
 
 
@@ -227,6 +135,7 @@ function ParcelMap({ parcel, initialCenter, onPickPoint }) {
 }
 
 export default function App() {
+  const [fontSize, setFontSize] = useFontSize();
   // Konto: strona startowa z logowaniem, aplikacja, profil z historią raportów
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
@@ -365,45 +274,35 @@ export default function App() {
   };
 
 
-  //Pobieranie raportu
-  const handleDownloadReport = async () => {
-    if (!report) return;
-    try {
-      const cropSlug = report.crop.key || report.crop.name.toLowerCase().replace(/\s+/g, "_");
-      const checkDate = report.date || new Date().toISOString().slice(0, 10);
-      const blob = await pdf(<ReportPdf report={report} />).toBlob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `raport_${cropSlug}_${checkDate}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    } catch (e) {
-      setError("Nie udało się wygenerować PDF: " + e.message);
-    }
-  };
-
   const filteredCrops = CROPS.filter((c) => {
     const matchesCategory = activeCategory === "Wszystkie" || c.category === activeCategory;
     const matchesSearch = c.name.toLowerCase().includes(cropSearch.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
-  // Drukowanie raportu jako PDF
+  // Drukowanie (otwiera widok do druku w nowej karcie) oraz pobieranie (pobiera gotowy plik PDF)
   const handlePrintReport = async () => {
     if (!report) return;
+    setError("");
     try {
-      const blob = await pdf(<ReportPdf report={report} />).toBlob();
-      const url = URL.createObjectURL(blob);
-      const win = window.open(url, "_blank");
-      if (!win) {
-        window.print();
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      await (report.historyId
+        ? api.openReportHtml(report.historyId)
+        : api.openAnalysisHtml(report.id));
     } catch (e) {
-      window.print();
+      setError(e.message);
+    }
+  };
+
+  const handleDownloadReport = async () => {
+    if (!report) return;
+    setError("");
+    const fallbackName = `raport_${report.parcel?.id || "dzialka"}_${report.date || ""}.pdf`;
+    try {
+      await (report.historyId
+        ? api.downloadReportPdf(report.historyId, fallbackName)
+        : api.downloadAnalysisPdf(report.id, fallbackName));
+    } catch (e) {
+      setError(e.message);
     }
   };
 
@@ -424,11 +323,23 @@ export default function App() {
   return (
     <div ref={topRef}>
       <header className="topbar">
-  <strong style={{ fontSize: 16, cursor: "pointer" }} onClick={handleReset}>
-    Wodnik
-  </strong>
+  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+    <strong style={{ fontSize: 16, cursor: "pointer" }} onClick={handleReset}>
+      Wodnik
+    </strong>
+    <div className="font-size-picker" role="group" aria-label="Wielkość czcionki">
+      <button type="button" className={`font-size-btn ${fontSize === "sm" ? "active" : ""}`} onClick={() => setFontSize("sm")} title="Mała czcionka">
+        <span style={{ fontSize: "11px", lineHeight: 1 }}>A</span>
+      </button>
+      <button type="button" className={`font-size-btn ${fontSize === "md" ? "active" : ""}`} onClick={() => setFontSize("md")} title="Średnia czcionka">
+        <span style={{ fontSize: "14px", lineHeight: 1 }}>A</span>
+      </button>
+      <button type="button" className={`font-size-btn ${fontSize === "lg" ? "active" : ""}`} onClick={() => setFontSize("lg")} title="Duża czcionka">
+        <span style={{ fontSize: "18px", lineHeight: 1 }}>A</span>
+      </button>
+    </div>
+  </div>
   <div className="topbar-actions">
-
     <button
       className="btn dark"
       style={{ height: 38, padding: "0 16px" }}
@@ -660,12 +571,6 @@ export default function App() {
                 <>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                     <h2>Twój raport</h2>
-                    <span
-                      style={{ fontSize: 13, color: "#555", cursor: "pointer", fontWeight: 600 }}
-                      onClick={handleDownloadReport}
-                    >
-                      Pobierz
-                    </span>
                   </div>
 
                   <div style={{ marginBottom: 18 }}>
@@ -750,6 +655,7 @@ export default function App() {
 
                     <Chat report={report} />
                   </div>
+                  {error && <p className="error-msg" role="alert" style={{ marginBottom: 16 }}>{error}</p>}
 
                   {/* Stopka raportu identyczna jak na screenie 3 */}
                   <div className="panel-footer">

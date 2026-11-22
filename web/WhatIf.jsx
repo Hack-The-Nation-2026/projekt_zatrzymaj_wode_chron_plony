@@ -16,11 +16,7 @@ export default function WhatIf({ w }) {
         {w.storms.map((s) => (
           <div key={s.rain_mm}>
             <span>Ulewa {fmt(s.rain_mm)} mm</span>
-            <b>{fmt(s.volume_total_m3)} m³</b>
-            <small>
-              spływu: {fmt(s.volume_parcel_m3)} m³ z działki
-              {s.volume_inflow_m3 ? ` + ${fmt(s.volume_inflow_m3)} m³ z sąsiednich pól` : ""}
-            </small>
+            <b>{fmt(s.volume_total_m3)} m³ spływu</b>
           </div>
         ))}
       </div>

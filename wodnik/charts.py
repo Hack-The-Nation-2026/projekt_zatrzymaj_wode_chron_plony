@@ -58,7 +58,7 @@ def water(c: dict, scenarios: dict | None = None) -> str:
 
     i_now = len(dates) - 1
     parts.append(f'<line x1="{x(i_now):.1f}" x2="{x(i_now):.1f}" y1="{T}" y2="{H - B}" stroke="{INK}"/>')
-    parts.append(_txt(x(i_now) - 4, T + 12, "dziś", "end", INK, 'font-weight="700"'))
+    parts.append(_txt(x(i_now) - 4, T + 12, f"dziś ({dates[-1].strftime('%d.%m')})", "end", INK, 'font-weight="700"'))
     if env:
         k = lambda j: i_now + j  # dzień j scenariusza
         band = (" ".join(f"{x(k(e['day'])):.1f},{y(taw - e['p10']):.1f}" for e in env) + " " +
@@ -93,7 +93,8 @@ def rain_et(c: dict) -> str:
     pts = " ".join(f"{x(i):.1f},{y(v):.1f}" for i, v in enumerate(e))
     parts.append(f'<polyline points="{pts}" fill="none" stroke="{ET}" stroke-width="2"/>')
     sp, se = sum(p), sum(e)
-    parts.append(_txt(W - R, 12, f"opad {sp:.0f} mm · parowanie {se:.0f} mm · bilans {sp - se:+.0f} mm".replace(".", ","),
+    period_lbl = f"{dates[0].strftime('%d.%m')}–{dates[-1].strftime('%d.%m')} ({len(dates)} dni): "
+    parts.append(_txt(W - R, 12, f"{period_lbl}opad {sp:.0f} mm · parowanie {se:.0f} mm · bilans {sp - se:+.0f} mm".replace(".", ","),
                       "end", INK))
     parts.append(f'<rect x="{L + 4}" y="3" width="10" height="10" fill="{RAIN}"/>' + _txt(L + 18, 12, "opad"))
     parts.append(f'<line x1="{L + 60}" x2="{L + 74}" y1="8" y2="8" stroke="{ET}" stroke-width="2"/>'

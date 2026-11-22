@@ -332,7 +332,7 @@ def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date |
              ("Roślina jest w stresie wodnym." if dr > raw else "Roślina nie jest jeszcze w stresie wodnym."),
              [f"bilans dobowy FAO-56 od {series.dates[0].strftime('%d.%m.%Y')}",
               f"{crop.name}: Kc z miesiąca, korzenie {num(crop.zr, 1)} m",
-              f"retencja użyteczna gleby {num(awc * 1000)} mm/m"],
+              f"retencja użyteczna gleby {num(awc * 1000)} mm/m (dla porównania: gleba średnia ok. 140–170 mm/m)"],
              "średnia"),
         Item("Klimatyczny bilans wodny (opad − parowanie)",
              f"Ostatnie 30 dni: {num(kbw30)} mm, ostatnie 60 dni: {num(kbw60)} mm. "
@@ -435,7 +435,7 @@ def analyse(parcel_id: str | None = None, point: tuple | None = None, on: date |
         causes.append(Cause("gleba", "Gleba słabo magazynuje wodę",
                             "silna" if s_soil >= 3 else "umiarkowana" if s_soil >= 1 else "słaba", s_soil,
                             [f"{soil.texture_label}: piasek {num(soil.sand_pct)}%, ił {num(soil.clay_pct)}%",
-                             f"retencja użyteczna {num(soil.awc_mm_per_m)} mm/m",
+                             f"retencja użyteczna {num(soil.awc_mm_per_m)} mm/m (gleba średnia trzyma ok. 140–170 mm/m)",
                              f"węgiel organiczny {num(soil.soc_pct, 1)}%"]))
     if terr:
         out_ha = sum(s.value for s in terr.outflow_points)

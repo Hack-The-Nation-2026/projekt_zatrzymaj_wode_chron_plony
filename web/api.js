@@ -84,6 +84,44 @@ function parcelView(p) {
 const jsonPost = (path, data) =>
   call(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
 
+const openHtml = async (path) => {
+  const win = window.open("", "_blank");
+  try {
+    const r = await fetch(API + path, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!r.ok) throw new Error("Nie udało się otworzyć raportu.");
+    const url = URL.createObjectURL(await r.blob());
+    win.location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    win?.close();
+    throw e;
+  }
+};
+
+const downloadPdf = async (path, fallbackName = "raport.pdf") => {
+  const r = await fetch(API + path, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    throw new Error(body?.error?.message || `Nie udało się pobrać pliku PDF (${r.status}).`);
+  }
+  const cd = r.headers.get("Content-Disposition") || "";
+  const m = cd.match(/filename="?([^";]+)"?/i);
+  const filename = m ? m[1] : fallbackName;
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+};
+
 export const api = {
   // --- konto ---
   isLoggedIn: () => Boolean(token),
@@ -117,11 +155,13 @@ export const api = {
   },
   deleteReport: (id) => call(`/me/reports/${id}`, { method: "DELETE" }),
   /** Otwiera raport z historii do druku w nowej karcie (wymaga zalogowania). */
-  openReportHtml: async (id) => {
-    const r = await fetch(`${API}/me/reports/${id}/raport`, { headers: { Authorization: `Bearer ${token}` } });
-    if (!r.ok) throw new Error("Nie udało się otworzyć raportu.");
-    window.open(URL.createObjectURL(await r.blob()), "_blank");
-  },
+  openReportHtml: (id) => openHtml(`/me/reports/${id}/raport`),
+  /** Otwiera raport z analizy do druku w nowej karcie. */
+  openAnalysisHtml: (analysisId) => openHtml(`/analyses/${analysisId}/raport`),
+  /** Pobiera bezpośrednio plik PDF raportu z historii. */
+  downloadReportPdf: (id, name) => downloadPdf(`/me/reports/${id}/raport.pdf`, name),
+  /** Pobiera bezpośrednio plik PDF raportu z analizy. */
+  downloadAnalysisPdf: (analysisId, name) => downloadPdf(`/analyses/${analysisId}/raport.pdf`, name),
 
   searchParcelById: async (id) => parcelView(await call(`/parcels/by-id?id=${encodeURIComponent(id)}`)),
 
@@ -158,3 +198,4 @@ export const api = {
     return toView(a.report, parcel, crop, job.id);
   },
 };
+

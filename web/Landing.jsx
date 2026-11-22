@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { api } from "./api.js";
+import { useFontSize } from "./useFontSize.js";
 import "./landing.css";
 
 // Strona startowa: opis projektu, pitch, model biznesowy oraz logowanie i zakładanie konta.
@@ -49,29 +50,57 @@ function Icon({ name }) {
   return <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
 }
 
+
 function ReportPreview() {
   return (
     <div className="lp-preview" aria-label="Przykładowy fragment raportu">
-      <div className="lp-preview-label">Tak wygląda raport</div>
+      <div className="lp-preview-label">Stres wodny i prognoza</div>
       <div className="lp-preview-head">
         <span>Łazisko · pszenica ozima · 15.06.2026</span>
         <span className="lp-chip warn">Rośliny w stresie wodnym</span>
       </div>
-      <svg viewBox="0 0 300 90" className="lp-preview-chart" aria-hidden="true">
+
+      <svg viewBox="0 0 300 90" className="lp-preview-chart" role="img"
+          aria-label="Prognoza uwodnienia: bez działań stres się pogłębia, z retencją pole wraca do normy">
         <rect x="0" y="48" width="300" height="42" fill="#3a1f24" opacity="0.5" />
         <line x1="0" x2="300" y1="48" y2="48" stroke="#ff8a80" strokeDasharray="4 4" />
-        <polyline points="0,8 40,9 80,14 120,22 150,40 175,62 200,78 225,80 240,72 250,66" fill="none" stroke="#4aa3e8" strokeWidth="2.5" />
-        <polygon points="250,66 275,58 300,50 300,82 275,80 250,66" fill="#4aa3e8" opacity="0.25" />
+        <text x="4" y="43" fontSize="7" fill="#ff8a80">próg stresu</text>
+
+        <polyline points="0,8 40,9 80,14 120,22 150,40 175,62 200,78 225,80 240,72 250,66"
+                  fill="none" stroke="#4aa3e8" strokeWidth="2.5" />
+        <polyline points="250,66 275,76 300,84" fill="none" stroke="#ff8a80"
+                  strokeWidth="2" strokeDasharray="4 3" />
+        <polyline points="250,66 275,50 300,34" fill="none" stroke="#6fcf6f" strokeWidth="2.5" />
+
         <line x1="250" x2="250" y1="0" y2="90" stroke="#f4f7f9" strokeWidth="1" />
+        <text x="246" y="9" fontSize="7" fill="#f4f7f9" textAnchor="end">dziś</text>
+        <text x="298" y="9" fontSize="7" fill="#9fb3c2" textAnchor="end">30 dni →</text>
       </svg>
-      <ol className="lp-preview-recs">
-        <li>Wał 30 cm w punktach odpływu: ok. 433 m zatrzyma ulewę 50 mm</li>
-        <li>Oczko w naturalnym obniżeniu: zmieści ok. 781 m³ wody</li>
-        <li>Międzyplony i resztki pożniwne: +5 mm wody w glebie</li>
-      </ol>
+
+      <div className="lp-legend" aria-hidden="true">
+        <span><i style={{ background: "#4aa3e8" }} />historia</span>
+        <span><i style={{ background: "#6fcf6f" }} />z Wodnikiem</span>
+        <span><i className="dashed" />bez działań</span>
+      </div>
+
+      <ul className="lp-gains">
+        <li className="lp-gain">
+          <b>50 mm</b>
+          <span>Cała ulewa zostaje na polu<small>wał 30 cm w punktach odpływu, ok. 433 m</small></span>
+        </li>
+        <li className="lp-gain">
+          <b>781 m³</b>
+          <span>Prawie ⅓ basenu olimpijskiego wody na zapas<small>oczko w naturalnym obniżeniu terenu</small></span>
+        </li>
+        <li className="lp-gain">
+          <b>+50 000 l</b>
+          <span>Więcej wody na każdym hektarze<small>międzyplony i resztki pożniwne (+5 mm)</small></span>
+        </li>
+      </ul>
     </div>
   );
 }
+
 
 function AuthCard({ onAuth, onGuest }) {
   const [mode, setMode] = useState("login");
@@ -131,36 +160,57 @@ function AuthCard({ onAuth, onGuest }) {
 }
 
 export default function Landing({ onAuth, onGuest }) {
+  const [fontSize, setFontSize] = useFontSize();
+
   return (
     <div className="lp">
-      <nav className="lp-nav">
-        <div className="lp-logo">
-          <svg width="22" height="28" viewBox="0 0 22 28" aria-hidden="true">
-            <path d="M11 1C11 1 1 14 1 19a10 10 0 0020 0C21 14 11 1 11 1z" fill="#4aa3e8" />
-          </svg>
-          Wodnik
+      <header className="topbar">
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <strong style={{ fontSize: 16, cursor: "pointer" }} onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+            Wodnik
+          </strong>
+          <div className="font-size-picker" role="group" aria-label="Wielkość czcionki">
+            <button type="button" className={`font-size-btn ${fontSize === "sm" ? "active" : ""}`} onClick={() => setFontSize("sm")} title="Mała czcionka">
+              <span style={{ fontSize: "11px", lineHeight: 1 }}>A</span>
+            </button>
+            <button type="button" className={`font-size-btn ${fontSize === "md" ? "active" : ""}`} onClick={() => setFontSize("md")} title="Średnia czcionka">
+              <span style={{ fontSize: "14px", lineHeight: 1 }}>A</span>
+            </button>
+            <button type="button" className={`font-size-btn ${fontSize === "lg" ? "active" : ""}`} onClick={() => setFontSize("lg")} title="Duża czcionka">
+              <span style={{ fontSize: "18px", lineHeight: 1 }}>A</span>
+            </button>
+          </div>
         </div>
-        <div className="lp-links">
-          <a href="#jak">Jak to działa</a>
-          <a href="#dane">Dane</a>
-          <a href="#model">Model</a>
-          <a className="btn dark lp-nav-btn" href="#logowanie">Zaloguj się</a>
+        <div className="topbar-actions">
+          <a className="btn" style={{ height: 38, padding: "0 16px", textDecoration: "none", borderRadius: "999px" }} href="#jak">
+            Jak to działa?
+          </a>
+          <a className="btn" style={{ height: 38, padding: "0 16px", textDecoration: "none", borderRadius: "999px" }} href="#dane">
+            Dane
+          </a>
+          <a className="btn" style={{ height: 38, padding: "0 16px", textDecoration: "none", borderRadius: "999px" }} href="#model">
+            Model
+          </a>
+          <a className="btn dark" style={{ height: 38, padding: "0 16px", textDecoration: "none", borderRadius: "999px" }} href="#logowanie">
+            Zaloguj się
+          </a>
         </div>
-      </nav>
+      </header>
 
-      <header className="lp-hero">
+      <header className="lp-hero" style={{ marginTop: "28px", marginBottom: "96px" }}>
         <div className="lp-hero-text">
           <div className="eyebrow">HackNation 2026 · zadanie KOWR</div>
           <h1>Zatrzymaj wodę,<br />chroń plony</h1>
           <p className="lp-lead">
-            Wpisz numer datę i wskaż działkę. Wodnik sprawdzi, czy Twoim roślinom brakuje wody, wyjaśni dlaczego
+            Wpisz numer działki i datę. Wodnik sprawdzi, czy Twoim roślinom brakuje wody, wyjaśni dlaczego
             i wskaże, gdzie na polu ją zatrzymać. Na danych publicznych, za darmo, w kilka minut.
           </p>
           <div className="lp-cta">
             <a className="btn dark" href="#logowanie">Załóż darmowe konto</a>
             <button type="button" className="btn" onClick={onGuest}>Sprawdź działkę bez konta</button>
           </div>
-          <ReportPreview />
+          <div className="lp-hero-spacer" aria-hidden="true" />
+          {/* <ReportPreview /> */}
         </div>
         <AuthCard onAuth={onAuth} onGuest={onGuest} />
       </header>
@@ -181,28 +231,24 @@ export default function Landing({ onAuth, onGuest }) {
 
       <section className="lp-section lp-pitch">
         <div>
-          <div className="eyebrow">Dlaczego Wodnik</div>
+          <div className="eyebrow">Dlaczego Wodnik?</div>
           <h2 className="lp-h2">Rolnik zna swoje pole. My dokładamy dane.</h2>
           <p>
-            Bardzo szanujemy pracę rolników: to oni najlepiej znają swoją ziemię, uprawy i pogodę za oknem.
+            Szanujemy pracę rolników: to oni najlepiej znają swoją ziemię, uprawy i pogodę za oknem.
             Łączenie zdjęć satelitarnych, modeli terenu i wieloletnich danych pogodowych to jednak zupełnie inna
-            specjalizacja, która nie powinna spadać na barki gospodarstwa. Wodnik robi to za rolnika i zamienia dane
+            specjalizacja, która nie powinna spadać na barki gospodarstwa. Nasz "Wodnik" robi to za rolnika i zamienia dane
             w konkretne wskazówki dla jednego pola.
           </p>
           <p>
-            Pomoc suszowa przychodzi po stracie. Wodnik ma pomóc wcześniej: pokazać, gdzie woda ucieka z pola,
+            Pomoc suszowa przychodzi po stracie. "Wodnik" ma pomóc wcześniej: pokazać, gdzie woda ucieka z pola,
             co zatrzyma ją najtaniej i jakie jest ryzyko w najbliższych 30 dniach.
           </p>
         </div>
-        <figure className="lp-photo">
-          <img src="/img/rolnik-pole.jpg" alt="Rolnik na skraju pola pszenicy o zachodzie słońca sprawdza w telefonie mapę swojej działki"
-               loading="lazy" width="1600" height="900" />
-          <figcaption>Wodnik działa w telefonie, prosto z pola.</figcaption>
-        </figure>
+        <ReportPreview />
       </section>
 
       <section className="lp-section" id="jak">
-        <div className="eyebrow">Jak to działa</div>
+        <div className="eyebrow">Jak to działa?</div>
         <h2 className="lp-h2">Od diagnozy do działania w 5 krokach</h2>
         <div className="lp-steps">
           {STEPS.map((s) => (

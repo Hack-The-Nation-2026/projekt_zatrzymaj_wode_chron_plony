@@ -21,6 +21,10 @@ export default function Profile({ user, onOpenReport, onBack }) {
     setError("");
     try { await api.openReportHtml(id); } catch (e) { setError(e.message); }
   };
+  const download = async (h) => {
+    setError("");
+    try { await api.downloadReportPdf(h.id, `raport_${h.parcel_id || h.id}_${h.date || ""}.pdf`); } catch (e) { setError(e.message); }
+  };
   const remove = async (id) => {
     if (!window.confirm("Usunąć ten raport z historii?")) return;
     try { await api.deleteReport(id); load(); } catch (e) { setError(e.message); }
@@ -53,6 +57,7 @@ export default function Profile({ user, onOpenReport, onBack }) {
                   </div>
                   <span className={`badge ${LEVEL[h.risk_level] || "warn"}`}>Ryzyko: {h.risk_level}</span>
                   <button className="btn dark" onClick={() => open(h.id)}>Otwórz</button>
+                  <button className="btn" onClick={() => download(h)}>Pobierz PDF</button>
                   <button className="btn" onClick={() => print(h.id)}>Drukuj</button>
                   <button className="btn" onClick={() => remove(h.id)} aria-label="Usuń raport">Usuń</button>
                 </li>
